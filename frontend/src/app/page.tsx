@@ -10,34 +10,34 @@ import { LanguageSelector } from '@/components/features/LanguageSelector'
 
 const features = [
   {
-    icon: Brain,
-    title: 'Meta-Learning AI',
-    description: 'AI that learns how to learn better. Every document processed improves accuracy for your specific use case.',
+    icon: Eye,
+    title: 'AI-Powered Vision',
+    description: 'Advanced computer vision that sees and understands text like the human eye, optimized for Malaysian documents.',
   },
   {
     icon: TrendingUp,
-    title: '96% Accuracy & Improving',
-    description: 'Industry-leading accuracy that gets better with use. Self-improving models adapt to your documents.',
+    title: '96% Accuracy',
+    description: 'Industry-leading accuracy with continuous learning. Our AI gets better with every document processed.',
   },
   {
-    icon: Globe,
+    icon: Languages,
     title: 'Multi-Language Support',
-    description: 'Native support for Bahasa Malaysia, English, Chinese, Tamil, and Jawi scripts with meta-learning adaptation.',
+    description: 'Native support for Bahasa Malaysia, English, Chinese, Tamil, and Jawi scripts with cultural understanding.',
   },
   {
     icon: Shield,
     title: 'Enterprise Security',
-    description: 'On-premise deployment options. Your data never leaves your infrastructure while AI learns locally.',
+    description: 'On-premise deployment options. Your sensitive documents never leave your infrastructure.',
   },
   {
-    icon: Layers,
-    title: 'Domain Adaptation',
-    description: 'Few-shot learning automatically adapts to your document types without manual retraining.',
+    icon: Globe,
+    title: 'Made for Malaysia',
+    description: 'Built specifically for Malaysian documents including MyKad, government forms, and local business documents.',
   },
   {
     icon: Users,
-    title: 'Made for SEA',
-    description: 'Built specifically for Southeast Asian documents, languages, and business requirements.',
+    title: 'ASEAN Ready',
+    description: 'Designed for Southeast Asian expansion with support for regional languages and document formats.',
   },
 ]
 
@@ -85,19 +85,19 @@ export default function HomePage() {
           <div className="container mx-auto px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
             <div className="mx-auto max-w-3xl text-center">
               <div className="mb-8 inline-flex items-center rounded-full bg-white/10 px-4 py-2 text-sm backdrop-blur">
-                <Brain className="mr-2 h-4 w-4" />
-                <span className="mr-2">🚀</span>
-                Meta-Learning AI • Made in Malaysia
+                <Eye className="mr-2 h-4 w-4" />
+                <span className="mr-2">🇲🇾</span>
+                Made in Malaysia for Southeast Asia
               </div>
               <h1 className="text-5xl font-bold tracking-tight sm:text-7xl">
-                Beyond Traditional
+                See Better,
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200">
-                  {' '}OCR
+                  {' '}Read Smarter
                 </span>
               </h1>
               <p className="mt-6 text-xl leading-8 text-gray-100">
-                <strong>MetaOCR</strong> uses meta-learning AI that gets smarter with every document. 
-                Process text in multiple languages with 96% accuracy that improves over time.
+                <strong>MataOCR</strong> brings AI-powered vision to document processing. 
+                Read text in multiple Malaysian languages with 96% accuracy and intelligent understanding.
               </p>
               <div className="mt-10 flex items-center justify-center gap-x-6">
                 <Link href="/signup">
@@ -139,11 +139,11 @@ export default function HomePage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-              See Meta-Learning in Action
+              MataOCR in Action
             </h2>
             <p className="mt-6 text-lg leading-8 text-gray-600">
-              Upload a document and watch MetaOCR learn from it in real-time. 
-              Each scan improves accuracy for similar document types.
+              Upload your Malaysian documents and see MataOCR's AI vision at work. 
+              From MyKad to business forms, experience precision OCR built for our region.
             </p>
           </div>
           <div className="mx-auto mt-16 max-w-5xl">
@@ -157,10 +157,10 @@ export default function HomePage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-              Why MetaOCR is Different
+              Why Choose MataOCR
             </h2>
             <p className="mt-6 text-lg leading-8 text-gray-600">
-              Traditional OCR reads text. MetaOCR learns how to read better with every document processed.
+              Built by Malaysians for Malaysians. MataOCR understands our languages, documents, and business needs like no other OCR solution.
             </p>
           </div>
           <div className="mx-auto mt-16 max-w-7xl">
@@ -217,7 +217,7 @@ export default function HomePage() {
               Ready for AI That Learns?
             </h2>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-purple-100">
-              Join leading Southeast Asian organizations using MetaOCR's meta-learning AI to process documents smarter and faster.
+              Join leading Southeast Asian organizations using MataOCR's intelligent vision to process documents faster and more accurately.
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Link href="/signup">
@@ -233,7 +233,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mt-6 text-sm text-purple-100">
-              ✨ Meta-learning AI • 🏢 Enterprise ready • 🔒 On-premise available • 🇲🇾 Made in Malaysia
+              👁️ AI-Powered Vision • 🏢 Enterprise ready • 🔒 On-premise available • 🇲🇾 Made in Malaysia
             </p>
           </div>
         </div>
