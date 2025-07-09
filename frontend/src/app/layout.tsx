@@ -1,25 +1,4 @@
-<<<<<<< HEAD
-import type { Metadata } from "next";
-import localFont from "next/font/local";
-import Navigation from "@/components/Navigation";
-import "./globals.css";
-
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
-
-export const metadata: Metadata = {
-  title: "MataOCR - Train Smarter OCR. With Less Effort",
-  description: "AI-powered OCR for Southeast Asian languages",
-};
-=======
+// frontend/src/app/layout.tsx - Updated for MetaOCR
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
@@ -37,21 +16,21 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'MataOCR - AI-Powered OCR for Southeast Asia',
-    template: '%s | MataOCR'
+    default: 'MetaOCR - Beyond Traditional OCR',
+    template: '%s | MetaOCR'
   },
-  description: 'See Better, Read Smarter. Process documents in Bahasa Malaysia, English, Chinese, Tamil & Jawi with 96% accuracy.',
+  description: 'AI that learns how to read better. Process documents with meta-learning OCR that improves with every scan. 96% accuracy across multiple languages.',
   keywords: [
     'OCR',
+    'Meta Learning',
     'Optical Character Recognition',
-    'Malaysia',
-    'Bahasa Malaysia',
-    'Jawi',
-    'AI',
-    'Machine Learning',
+    'AI OCR',
     'Document Processing',
-    'MyKad',
-    'Southeast Asia'
+    'Machine Learning',
+    'Artificial Intelligence',
+    'Southeast Asia',
+    'Malaysia',
+    'Multi-language OCR'
   ],
   authors: [{ name: 'VisionTech Malaysia' }],
   creator: 'VisionTech Malaysia',
@@ -59,25 +38,25 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     alternateLocale: ['ms_MY', 'zh_CN', 'ta_IN'],
-    url: 'https://mataocr.com',
-    siteName: 'MataOCR',
-    title: 'MataOCR - AI-Powered OCR for Southeast Asia',
-    description: 'See Better, Read Smarter. Process documents in multiple Southeast Asian languages with high accuracy.',
+    url: 'https://metaocr.com',
+    siteName: 'MetaOCR',
+    title: 'MetaOCR - Beyond Traditional OCR',
+    description: 'AI that learns how to read better. Meta-learning OCR that improves with every document processed.',
     images: [
       {
-        url: 'https://mataocr.com/og-image.png',
+        url: 'https://metaocr.com/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'MataOCR - AI-Powered OCR',
+        alt: 'MetaOCR - Beyond Traditional OCR',
       }
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MataOCR - AI-Powered OCR for Southeast Asia',
-    description: 'See Better, Read Smarter. Process documents in multiple languages with 96% accuracy.',
-    images: ['https://mataocr.com/og-image.png'],
-    creator: '@mataocr',
+    title: 'MetaOCR - Beyond Traditional OCR',
+    description: 'AI that learns how to read better. Meta-learning OCR with 96% accuracy.',
+    images: ['https://metaocr.com/og-image.png'],
+    creator: '@metaocr',
   },
   robots: {
     index: true,
@@ -96,39 +75,4 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   manifest: '/site.webmanifest',
-}
->>>>>>> 61e2d6470e16575b47b3785e3000e32d2e01ab9d
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-<<<<<<< HEAD
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Navigation />
-        {children}
-=======
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <div className="relative flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
-          <Toaster position="bottom-right" />
-        </ThemeProvider>
-        <Analytics />
->>>>>>> 61e2d6470e16575b47b3785e3000e32d2e01ab9d
-      </body>
-    </html>
-  )
 }
