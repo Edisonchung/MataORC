@@ -1,9 +1,5 @@
 /** @type {import('next').NextConfig} */
 
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-})
-
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
@@ -16,13 +12,6 @@ const nextConfig = {
       'images.unsplash.com' // for demo images
     ],
     formats: ['image/avif', 'image/webp'],
-  },
-
-  // Internationalization for ASEAN expansion
-  i18n: {
-    locales: ['en', 'ms', 'zh', 'ta'],
-    defaultLocale: 'en',
-    localeDetection: true,
   },
 
   // Environment variables available to the browser
@@ -102,6 +91,7 @@ const nextConfig = {
   webpack: (config, { isServer }) => {
     // Handle canvas for OCR visualization
     if (!isServer) {
+      config.externals = config.externals || [];
       config.externals.push({
         canvas: 'canvas',
       })
@@ -110,4 +100,4 @@ const nextConfig = {
   },
 }
 
-module.exports = withBundleAnalyzer(nextConfig)
+module.exports = nextConfig
