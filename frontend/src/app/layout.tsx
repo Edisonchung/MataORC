@@ -16,21 +16,22 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'MetaOCR - Beyond Traditional OCR',
-    template: '%s | MetaOCR'
+    default: 'MataOCR - AI-Powered OCR for Southeast Asia',
+    template: '%s | MataOCR'
   },
-  description: 'AI that learns how to read better. Process documents with meta-learning OCR that improves with every scan. 96% accuracy across multiple languages.',
+  description: 'See Better, Read Smarter. Process documents in Bahasa Malaysia, English, Chinese, Tamil & Jawi with 96% accuracy. Made in Malaysia for Southeast Asia.',
   keywords: [
     'OCR',
-    'Meta Learning',
     'Optical Character Recognition',
-    'AI OCR',
-    'Document Processing',
-    'Machine Learning',
-    'Artificial Intelligence',
-    'Southeast Asia',
     'Malaysia',
-    'Multi-language OCR'
+    'Bahasa Malaysia',
+    'Jawi',
+    'AI',
+    'Machine Learning',
+    'Document Processing',
+    'MyKad',
+    'Southeast Asia',
+    'Mata OCR'
   ],
   authors: [{ name: 'VisionTech Malaysia' }],
   creator: 'VisionTech Malaysia',
@@ -38,25 +39,25 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     alternateLocale: ['ms_MY', 'zh_CN', 'ta_IN'],
-    url: 'https://metaocr.com',
-    siteName: 'MetaOCR',
-    title: 'MetaOCR - Beyond Traditional OCR',
-    description: 'AI that learns how to read better. Meta-learning OCR that improves with every document processed.',
+    url: 'https://mataocr.com',
+    siteName: 'MataOCR',
+    title: 'MataOCR - AI-Powered OCR for Southeast Asia',
+    description: 'See Better, Read Smarter. Process documents in multiple Southeast Asian languages with 96% accuracy.',
     images: [
       {
-        url: 'https://metaocr.com/og-image.png',
+        url: 'https://mataocr.com/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'MetaOCR - Beyond Traditional OCR',
+        alt: 'MataOCR - AI-Powered OCR for Southeast Asia',
       }
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MetaOCR - Beyond Traditional OCR',
-    description: 'AI that learns how to read better. Meta-learning OCR with 96% accuracy.',
-    images: ['https://metaocr.com/og-image.png'],
-    creator: '@metaocr',
+    title: 'MataOCR - AI-Powered OCR for Southeast Asia',
+    description: 'See Better, Read Smarter. Process documents in multiple languages with 96% accuracy.',
+    images: ['https://mataocr.com/og-image.png'],
+    creator: '@mataocr',
   },
   robots: {
     index: true,
