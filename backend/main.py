@@ -1,4 +1,4 @@
-# backend/main.py - MetaOCR FastAPI Backend
+# backend/main.py - MataOCR FastAPI Backend
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -20,7 +20,7 @@ from models.schemas import (
 )
 from services.ocr_service import OCRService
 from services.synthetic_service import SyntheticDataService
-from services.meta_learning_service import MetaLearningService
+from services.ai_learning_service import AILearningService
 from services.validation_service import ValidationService
 from utils.auth import verify_token
 from utils.storage import FileStorage
@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="MetaOCR API",
-    description="Beyond Traditional OCR - Meta-learning AI for document processing",
+    title="MataOCR API",
+    description="See Better, Read Smarter - AI-powered OCR for Southeast Asia",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -62,8 +62,8 @@ app = FastAPI(
             "description": "Model validation and quality scoring"
         },
         {
-            "name": "meta-learning",
-            "description": "Meta-learning and active learning operations"
+            "name": "ai-learning",
+            "description": "AI learning and active learning operations"
         }
     ]
 )
@@ -71,7 +71,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://metaocr.com", "https://www.metaocr.com"],
+    allow_origins=["http://localhost:3000", "https://mataocr.com", "https://www.mataocr.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,7 +83,7 @@ security = HTTPBearer()
 # Initialize services
 ocr_service = OCRService()
 synthetic_service = SyntheticDataService()
-meta_learning_service = MetaLearningService()
+ai_learning_service = AILearningService()
 validation_service = ValidationService()
 file_storage = FileStorage()
 
@@ -91,11 +91,11 @@ file_storage = FileStorage()
 @app.on_event("startup")
 async def startup_event():
     """Initialize database and services on startup"""
-    logger.info("Starting MetaOCR API...")
+    logger.info("Starting MataOCR API...")
     await create_tables()
     await ocr_service.initialize()
     await synthetic_service.initialize()
-    logger.info("MetaOCR API started successfully")
+    logger.info("MataOCR API started successfully")
 
 # Health Check
 @app.get("/health", tags=["health"])
@@ -103,10 +103,11 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "MetaOCR API",
+        "service": "MataOCR API",
         "version": "1.0.0",
         "timestamp": datetime.utcnow().isoformat(),
-        "meta_learning": "active"
+        "ai_vision": "active",
+        "tagline": "See Better, Read Smarter"
     }
 
 @app.get("/health/detailed", tags=["health"])
