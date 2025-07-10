@@ -1,33 +1,63 @@
-# backend/main.py - MataOCR FastAPI Backend
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks
+"""
+MataOCR FastAPI Backend
+See Better, Read Smarter - AI-powered OCR for Southeast Asia
+"""
+
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import uvicorn
 import os
-from datetime import datetime
-import uuid
 import json
 import logging
+from datetime import datetime
+import uuid
 from pathlib import Path
-
-# Import our custom modules (to be created)
-from models.database import get_db, create_tables
-from models.schemas import (
-    ProjectCreate, Project, ImageUpload, OCRResult, 
-    SyntheticGenerationConfig, ValidationResult, ActiveLearningQuery
-)
-from services.ocr_service import OCRService
-from services.synthetic_service import SyntheticDataService
-from services.ai_learning_service import AILearningService
-from services.validation_service import ValidationService
-from utils.auth import verify_token
-from utils.storage import FileStorage
+import aiofiles
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Pydantic models for API
+class HealthResponse(BaseModel):
+    status: str
+    timestamp: str
+    version: str
+    services: Dict[str, str]
+
+class OCRRequest(BaseModel):
+    languages: List[str] = ["en", "ms"]  # Default: English and Bahasa Malaysia
+    confidence_threshold: float = 0.8
+    detect_tables: bool = False
+    detect_stamps: bool = False
+
+class OCRResult(BaseModel):
+    success: bool
+    text: str
+    confidence: float
+    language_detected: str
+    processing_time: float
+    bounding_boxes: List[Dict[str, Any]]
+    metadata: Dict[str, Any]
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    languages: List[str] = ["en", "ms"]
+    project_type: str = "general"
+
+class Project(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    languages: List[str]
+    project_type: str
+    created_at: str
+    image_count: int = 0
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -37,387 +67,307 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_tags=[
-        {
-            "name": "health",
-            "description": "Health check and system status"
-        },
-        {
-            "name": "projects",
-            "description": "Project management operations"
-        },
-        {
-            "name": "upload",
-            "description": "File upload and processing"
-        },
-        {
-            "name": "ocr",
-            "description": "OCR processing and results"
-        },
-        {
-            "name": "synthetic",
-            "description": "Synthetic data generation"
-        },
-        {
-            "name": "validation",
-            "description": "Model validation and quality scoring"
-        },
-        {
-            "name": "ai-learning",
-            "description": "AI learning and active learning operations"
-        }
+        {"name": "health", "description": "Health check and system status"},
+        {"name": "projects", "description": "Project management operations"},
+        {"name": "ocr", "description": "OCR processing and results"},
+        {"name": "upload", "description": "File upload and processing"},
     ]
 )
 
-# CORS middleware
+# CORS middleware for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://mataocr.com", "https://www.mataocr.com"],
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "https://mata-orc.vercel.app",  # Current deployment
+        "https://mataocr.com",  # Production domain
+        "https://www.mataocr.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Security
-security = HTTPBearer()
+# In-memory storage (will be replaced with PostgreSQL)
+projects_db = {}
+upload_dir = Path("uploads")
+upload_dir.mkdir(exist_ok=True)
 
-# Initialize services
-ocr_service = OCRService()
-synthetic_service = SyntheticDataService()
-ai_learning_service = AILearningService()
-validation_service = ValidationService()
-file_storage = FileStorage()
+# Supported languages for Malaysian market
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "ms": "Bahasa Malaysia", 
+    "zh": "Chinese",
+    "ta": "Tamil",
+    "ar": "Arabic/Jawi"
+}
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database and services on startup"""
-    logger.info("Starting MataOCR API...")
-    await create_tables()
-    await ocr_service.initialize()
-    await synthetic_service.initialize()
-    logger.info("MataOCR API started successfully")
+# Maximum file size (10MB)
+MAX_FILE_SIZE = 10 * 1024 * 1024
 
-# Health Check
-@app.get("/health", tags=["health"])
-async def health_check():
-    """Health check endpoint"""
+@app.get("/", tags=["health"])
+async def root():
+    """Root endpoint with API information"""
     return {
-        "status": "healthy",
-        "service": "MataOCR API",
+        "message": "MataOCR API - See Better, Read Smarter",
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat(),
-        "ai_vision": "active",
-        "tagline": "See Better, Read Smarter"
+        "docs": "/docs",
+        "health": "/health"
     }
 
-@app.get("/health/detailed", tags=["health"])
-async def detailed_health_check():
-    """Detailed health check with service status"""
+@app.get("/health", response_model=HealthResponse, tags=["health"])
+async def health_check():
+    """Comprehensive health check for all services"""
+    
+    # Check OCR service availability (placeholder)
+    ocr_status = "ready"  # Will be "operational" when PaddleOCR is integrated
+    
+    # Check database connectivity (placeholder)
+    db_status = "mock"  # Will be "connected" when PostgreSQL is integrated
+    
+    # Check file storage (placeholder)
+    storage_status = "local"  # Will be "cloud" when MinIO/S3 is integrated
+    
+    return HealthResponse(
+        status="healthy",
+        timestamp=datetime.now().isoformat(),
+        version="1.0.0",
+        services={
+            "ocr_engine": ocr_status,
+            "database": db_status,
+            "file_storage": storage_status,
+            "api": "operational"
+        }
+    )
+
+@app.get("/languages", tags=["ocr"])
+async def get_supported_languages():
+    """Get list of supported languages for Malaysian market"""
     return {
-        "status": "healthy",
-        "services": {
-            "ocr_engine": await ocr_service.health_check(),
-            "synthetic_generator": await synthetic_service.health_check(),
-            "meta_learning": await meta_learning_service.health_check(),
-            "database": "connected",
-            "storage": "available"
-        },
-        "timestamp": datetime.utcnow().isoformat()
+        "supported_languages": SUPPORTED_LANGUAGES,
+        "default": ["en", "ms"],
+        "recommended_for_malaysia": ["ms", "en", "zh", "ta"]
     }
 
-# Project Management
 @app.post("/projects", response_model=Project, tags=["projects"])
-async def create_project(
-    project: ProjectCreate,
-    db=Depends(get_db),
-    token: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Create a new MetaOCR project"""
-    user_id = verify_token(token.credentials)
-    
+async def create_project(project: ProjectCreate):
+    """Create a new OCR project"""
     project_id = str(uuid.uuid4())
-    new_project = {
-        "id": project_id,
-        "name": project.name,
-        "description": project.description,
-        "language": project.language,
-        "domain": project.domain,
-        "user_id": user_id,
-        "created_at": datetime.utcnow(),
-        "meta_learning_enabled": True,
-        "accuracy_target": project.accuracy_target or 0.95
-    }
     
-    # Initialize meta-learning for this project
-    await meta_learning_service.initialize_project(project_id, project.domain, project.language)
+    # Validate languages
+    invalid_langs = [lang for lang in project.languages if lang not in SUPPORTED_LANGUAGES]
+    if invalid_langs:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported languages: {invalid_langs}. Supported: {list(SUPPORTED_LANGUAGES.keys())}"
+        )
     
-    logger.info(f"Created project {project_id} with meta-learning enabled")
+    new_project = Project(
+        id=project_id,
+        name=project.name,
+        description=project.description,
+        languages=project.languages,
+        project_type=project.project_type,
+        created_at=datetime.now().isoformat(),
+        image_count=0
+    )
+    
+    projects_db[project_id] = new_project
+    logger.info(f"Created project: {project.name} ({project_id})")
+    
     return new_project
 
 @app.get("/projects", response_model=List[Project], tags=["projects"])
-async def get_projects(
-    db=Depends(get_db),
-    token: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Get all projects for authenticated user"""
-    user_id = verify_token(token.credentials)
-    # Database query logic here
-    return []
+async def list_projects():
+    """List all OCR projects"""
+    return list(projects_db.values())
 
 @app.get("/projects/{project_id}", response_model=Project, tags=["projects"])
-async def get_project(
-    project_id: str,
-    db=Depends(get_db),
-    token: HTTPAuthorizationCredentials = Depends(security)
-):
+async def get_project(project_id: str):
     """Get specific project details"""
-    user_id = verify_token(token.credentials)
-    # Database query logic here
-    return {}
+    if project_id not in projects_db:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    return projects_db[project_id]
 
-# File Upload and Processing
-@app.post("/upload/seed/{project_id}", tags=["upload"])
-async def upload_seed_images(
-    project_id: str,
-    files: List[UploadFile] = File(...),
-    language: str = "en",
-    background_tasks: BackgroundTasks = BackgroundTasks(),
-    token: HTTPAuthorizationCredentials = Depends(security)
+@app.post("/upload", tags=["upload"])
+async def upload_file(
+    file: UploadFile = File(...),
+    project_id: Optional[str] = None
 ):
-    """Upload seed images for meta-learning training"""
-    user_id = verify_token(token.credentials)
+    """Upload image file for OCR processing"""
     
-    if len(files) > 50:
-        raise HTTPException(status_code=400, detail="Maximum 50 files per upload")
-    
-    uploaded_files = []
-    
-    for file in files:
-        # Validate file type
-        if not file.content_type.startswith('image/'):
-            continue
-            
-        # Save file
-        file_id = str(uuid.uuid4())
-        file_path = await file_storage.save_upload(file, project_id, file_id)
-        
-        # Queue for OCR processing
-        background_tasks.add_task(
-            process_seed_image, 
-            project_id, 
-            file_id, 
-            file_path, 
-            language
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/jpg", "application/pdf"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type {file.content_type} not supported. Allowed: {allowed_types}"
         )
-        
-        uploaded_files.append({
-            "file_id": file_id,
-            "filename": file.filename,
-            "size": file.size,
-            "status": "processing"
-        })
     
-    logger.info(f"Uploaded {len(uploaded_files)} seed images for project {project_id}")
+    # Check file size
+    file_size = 0
+    file_content = await file.read()
+    file_size = len(file_content)
+    
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size: {MAX_FILE_SIZE/1024/1024:.1f}MB"
+        )
+    
+    # Generate unique filename
+    file_extension = Path(file.filename).suffix
+    unique_filename = f"{uuid.uuid4()}{file_extension}"
+    file_path = upload_dir / unique_filename
+    
+    # Save file
+    async with aiofiles.open(file_path, 'wb') as f:
+        await f.write(file_content)
+    
+    # Update project image count if project specified
+    if project_id and project_id in projects_db:
+        projects_db[project_id].image_count += 1
+    
+    logger.info(f"Uploaded file: {file.filename} -> {unique_filename}")
+    
     return {
-        "project_id": project_id,
-        "uploaded_files": uploaded_files,
-        "meta_learning_status": "initializing"
+        "success": True,
+        "filename": unique_filename,
+        "original_filename": file.filename,
+        "file_size": file_size,
+        "content_type": file.content_type,
+        "upload_time": datetime.now().isoformat()
     }
 
-async def process_seed_image(project_id: str, file_id: str, file_path: str, language: str):
-    """Background task to process seed images"""
-    try:
-        # Run OCR
-        ocr_result = await ocr_service.process_image(file_path, language)
-        
-        # Update meta-learning model with this seed data
-        await meta_learning_service.add_seed_data(project_id, file_id, ocr_result)
-        
-        logger.info(f"Processed seed image {file_id} for project {project_id}")
-        
-    except Exception as e:
-        logger.error(f"Error processing seed image {file_id}: {str(e)}")
-
-# OCR Processing
 @app.post("/ocr/process", response_model=OCRResult, tags=["ocr"])
 async def process_ocr(
     file: UploadFile = File(...),
-    language: str = "en",
-    project_id: Optional[str] = None,
-    token: HTTPAuthorizationCredentials = Depends(security)
+    languages: str = "en,ms",  # Comma-separated language codes
+    confidence_threshold: float = 0.8,
+    detect_tables: bool = False
 ):
-    """Process single image with MetaOCR"""
-    user_id = verify_token(token.credentials)
+    """
+    Process uploaded image with OCR
     
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="File must be an image")
+    Currently returns mock data - will be replaced with PaddleOCR integration
+    """
     
-    # Save file temporarily
-    file_id = str(uuid.uuid4())
-    file_path = await file_storage.save_temp(file, file_id)
+    start_time = datetime.now()
+    
+    # Parse languages
+    lang_list = [lang.strip() for lang in languages.split(",")]
+    
+    # Validate languages
+    invalid_langs = [lang for lang in lang_list if lang not in SUPPORTED_LANGUAGES]
+    if invalid_langs:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported languages: {invalid_langs}"
+        )
+    
+    # Save uploaded file temporarily
+    file_content = await file.read()
+    temp_filename = f"temp_{uuid.uuid4()}{Path(file.filename).suffix}"
+    temp_path = upload_dir / temp_filename
+    
+    async with aiofiles.open(temp_path, 'wb') as f:
+        await f.write(file_content)
     
     try:
-        # Use meta-learning enhanced OCR if project specified
-        if project_id:
-            ocr_result = await meta_learning_service.process_with_meta_learning(
-                project_id, file_path, language
-            )
-        else:
-            ocr_result = await ocr_service.process_image(file_path, language)
+        # TODO: Replace with actual PaddleOCR processing
+        # For now, return mock data to enable frontend integration
         
-        # If project specified, use this result to improve meta-learning
-        if project_id:
-            await meta_learning_service.update_from_inference(project_id, file_id, ocr_result)
+        # Simulate processing time
+        await asyncio.sleep(1)
         
-        return ocr_result
+        # Mock OCR result for Malaysian document
+        mock_text = """
+KERAJAAN MALAYSIA
+MyKad No: 123456-78-9012
+Nama: Ahmad bin Abdullah
+Alamat: No. 123, Jalan Bunga Raya
+        Taman Sri Malaysia
+        50000 Kuala Lumpur
+Telefon: 03-12345678
+"""
         
-    finally:
-        # Clean up temp file
-        await file_storage.cleanup_temp(file_path)
-
-# Synthetic Data Generation
-@app.post("/generate/synthetic/{project_id}", tags=["synthetic"])
-async def generate_synthetic_data(
-    project_id: str,
-    config: SyntheticGenerationConfig,
-    background_tasks: BackgroundTasks,
-    token: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Generate synthetic training data with meta-learning insights"""
-    user_id = verify_token(token.credentials)
-    
-    # Get meta-learning insights for this project
-    meta_insights = await meta_learning_service.get_generation_insights(project_id)
-    
-    # Queue synthetic generation
-    generation_id = str(uuid.uuid4())
-    background_tasks.add_task(
-        generate_synthetic_batch,
-        project_id,
-        generation_id,
-        config,
-        meta_insights
-    )
-    
-    return {
-        "generation_id": generation_id,
-        "project_id": project_id,
-        "status": "queued",
-        "estimated_count": config.num_samples,
-        "meta_learning_enhanced": True
-    }
-
-async def generate_synthetic_batch(
-    project_id: str,
-    generation_id: str, 
-    config: SyntheticGenerationConfig,
-    meta_insights: Dict[str, Any]
-):
-    """Background task for synthetic data generation"""
-    try:
-        # Generate synthetic data using meta-learning insights
-        synthetic_data = await synthetic_service.generate_with_meta_learning(
-            config, meta_insights
+        processing_time = (datetime.now() - start_time).total_seconds()
+        
+        result = OCRResult(
+            success=True,
+            text=mock_text.strip(),
+            confidence=0.92,
+            language_detected="ms",  # Bahasa Malaysia detected
+            processing_time=processing_time,
+            bounding_boxes=[
+                {
+                    "text": "KERAJAAN MALAYSIA",
+                    "bbox": [10, 10, 200, 30],
+                    "confidence": 0.95
+                },
+                {
+                    "text": "MyKad No: 123456-78-9012",
+                    "bbox": [10, 40, 250, 60],
+                    "confidence": 0.91
+                },
+                {
+                    "text": "Nama: Ahmad bin Abdullah",
+                    "bbox": [10, 70, 300, 90],
+                    "confidence": 0.89
+                }
+            ],
+            metadata={
+                "file_size": len(file_content),
+                "file_type": file.content_type,
+                "languages_requested": lang_list,
+                "processing_engine": "mock_paddleocr",
+                "document_type": "malaysian_id",
+                "tables_detected": 0 if not detect_tables else 1
+            }
         )
         
-        # Validate generated data
-        validated_data = await validation_service.validate_synthetic_batch(synthetic_data)
-        
-        # Update meta-learning model with synthetic results
-        await meta_learning_service.update_from_synthetic(project_id, validated_data)
-        
-        logger.info(f"Generated {len(validated_data)} synthetic samples for project {project_id}")
+        logger.info(f"OCR processed: {file.filename} in {processing_time:.2f}s")
+        return result
         
     except Exception as e:
-        logger.error(f"Error generating synthetic data: {str(e)}")
-
-# Validation
-@app.post("/validate/{image_id}", response_model=ValidationResult, tags=["validation"])
-async def validate_image(
-    image_id: str,
-    ground_truth: Optional[str] = None,
-    token: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Validate OCR results and update meta-learning"""
-    user_id = verify_token(token.credentials)
-    
-    validation_result = await validation_service.validate_image(image_id, ground_truth)
-    
-    # Update meta-learning with validation feedback
-    if validation_result.project_id:
-        await meta_learning_service.update_from_validation(
-            validation_result.project_id, 
-            image_id, 
-            validation_result
+        logger.error(f"OCR processing failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"OCR processing failed: {str(e)}"
         )
     
-    return validation_result
+    finally:
+        # Cleanup temporary file
+        if temp_path.exists():
+            temp_path.unlink()
 
-# Meta-Learning and Active Learning
-@app.post("/meta-learning/active-query/{project_id}", tags=["meta-learning"])
-async def query_active_learning(
-    project_id: str,
-    query_params: ActiveLearningQuery,
-    token: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Get next samples for active learning based on meta-learning insights"""
-    user_id = verify_token(token.credentials)
-    
-    # Use meta-learning to identify most informative samples
-    candidates = await meta_learning_service.select_active_learning_samples(
-        project_id, 
-        query_params.max_samples,
-        query_params.uncertainty_threshold
+@app.get("/stats", tags=["health"])
+async def get_stats():
+    """Get API usage statistics"""
+    return {
+        "total_projects": len(projects_db),
+        "total_uploads": len(list(upload_dir.glob("*"))),
+        "supported_languages": len(SUPPORTED_LANGUAGES),
+        "api_version": "1.0.0",
+        "uptime": "operational"
+    }
+
+# Error handlers
+@app.exception_handler(404)
+async def not_found_handler(request, exc):
+    return JSONResponse(
+        status_code=404,
+        content={"error": "Endpoint not found", "detail": str(exc)}
     )
-    
-    return {
-        "project_id": project_id,
-        "candidates": candidates,
-        "meta_learning_confidence": await meta_learning_service.get_model_confidence(project_id),
-        "next_learning_iteration": await meta_learning_service.get_next_iteration_info(project_id)
-    }
 
-@app.post("/meta-learning/feedback/{project_id}", tags=["meta-learning"])
-async def submit_learning_feedback(
-    project_id: str,
-    feedback_data: Dict[str, Any],
-    token: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Submit human feedback for meta-learning improvement"""
-    user_id = verify_token(token.credentials)
-    
-    # Process feedback and update meta-learning model
-    await meta_learning_service.process_human_feedback(project_id, feedback_data)
-    
-    # Trigger model adaptation if enough feedback received
-    adaptation_triggered = await meta_learning_service.check_adaptation_trigger(project_id)
-    
-    return {
-        "project_id": project_id,
-        "feedback_processed": True,
-        "adaptation_triggered": adaptation_triggered,
-        "model_improvement": await meta_learning_service.get_recent_improvements(project_id)
-    }
-
-# Analytics and Insights
-@app.get("/analytics/{project_id}/meta-learning", tags=["meta-learning"])
-async def get_meta_learning_analytics(
-    project_id: str,
-    token: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Get meta-learning analytics and performance insights"""
-    user_id = verify_token(token.credentials)
-    
-    analytics = await meta_learning_service.get_project_analytics(project_id)
-    
-    return {
-        "project_id": project_id,
-        "meta_learning_progress": analytics["progress"],
-        "accuracy_trends": analytics["accuracy_trends"],
-        "domain_adaptation_score": analytics["adaptation_score"],
-        "learning_efficiency": analytics["efficiency_metrics"],
-        "next_recommendations": analytics["recommendations"]
-    }
+@app.exception_handler(500)
+async def internal_error_handler(request, exc):
+    logger.error(f"Internal server error: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error", "detail": "Please try again later"}
+    )
 
 if __name__ == "__main__":
     uvicorn.run(
