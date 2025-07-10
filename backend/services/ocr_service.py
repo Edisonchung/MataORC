@@ -1,15 +1,13 @@
 # backend/services/ocr_service.py
 """
-MataOCR Real OCR Service
-Advanced OCR processing with Malaysian optimization
+MataOCR Working OCR Service - NumPy 1.x Compatible
 See Better, Read Smarter - AI-powered OCR for Southeast Asia
 """
 
 import cv2
 import numpy as np
-from paddleocr import PaddleOCR
-import pytesseract
 from PIL import Image
+import pytesseract
 import asyncio
 import logging
 import time
@@ -22,31 +20,42 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class RealOCRService:
+class WorkingOCRService:
     """
-    Advanced OCR service with Malaysian optimization
-    Primary: PaddleOCR (excellent for Asian languages)
-    Fallback: Tesseract
+    Production OCR service with NumPy 1.x compatibility
+    Primary: PaddleOCR (if available)
+    Fallback: Tesseract (always available)
     """
     
     def __init__(self):
         self.executor = ThreadPoolExecutor(max_workers=4)
+        self.paddle_available = False
         self.paddle_models = {}
         self.stats = {
             "total_processed": 0,
             "avg_processing_time": 0,
             "avg_confidence": 0,
             "language_distribution": {},
-            "error_count": 0
+            "error_count": 0,
+            "engine_usage": {"tesseract": 0, "paddleocr": 0}
         }
         
         # Malaysian language mappings
         self.language_codes = {
-            'ms': 'en',  # Bahasa Malaysia (use English model with post-processing)
-            'en': 'en',  # English
-            'zh': 'ch',  # Chinese
-            'ta': 'ta',  # Tamil
-            'ar': 'ar'   # Arabic (for Jawi script)
+            'ms': 'eng',    # Bahasa Malaysia (use English model + post-processing)
+            'en': 'eng',    # English
+            'zh': 'chi_sim',# Chinese Simplified
+            'ta': 'tam',    # Tamil
+            'ar': 'ara'     # Arabic (for Jawi script)
+        }
+        
+        # PaddleOCR language mappings
+        self.paddle_language_codes = {
+            'ms': 'en',     # Bahasa Malaysia
+            'en': 'en',     # English
+            'zh': 'ch',     # Chinese
+            'ta': 'ta',     # Tamil
+            'ar': 'ar'      # Arabic
         }
         
         # Malaysian document patterns
@@ -59,20 +68,57 @@ class RealOCRService:
         
         # Common Malaysian text corrections
         self.malaysian_corrections = {
-            'Identiti': 'Identiti',
-            'Warganegara': 'Warganegara',
-            'Lelaki': 'Lelaki',
-            'Perempuan': 'Perempuan',
-            'Alamat': 'Alamat',
-            'Tarikh': 'Tarikh',
-            'Lahir': 'Lahir'
+            'ldentiti': 'Identiti',
+            'Warganegera': 'Warganegara',
+            'Wargenegara': 'Warganegara',
+            'Lelald': 'Lelaki',
+            'Perempuen': 'Perempuan',
+            'Alemat': 'Alamat',
+            'Terlkh': 'Tarikh',
+            'Lahie': 'Lahir',
+            'Mykad': 'MyKad',
+            'ldentity': 'Identity',
+            'Cerd': 'Card',
+            'Kad': 'Kad'
         }
+        
+        # Initialize services
+        self._check_paddle_availability()
+        self._check_tesseract()
 
-    async def initialize_paddle_model(self, language: str) -> PaddleOCR:
-        """Initialize PaddleOCR model for specific language"""
+    def _check_paddle_availability(self):
+        """Check if PaddleOCR is available"""
+        try:
+            import paddleocr
+            self.paddle_available = True
+            logger.info("✅ PaddleOCR available - will be used as primary engine")
+        except ImportError as e:
+            self.paddle_available = False
+            logger.warning(f"⚠️ PaddleOCR not available: {e}")
+            logger.info("🔄 Using Tesseract as primary engine")
+
+    def _check_tesseract(self):
+        """Check if Tesseract is available"""
+        try:
+            version = pytesseract.get_tesseract_version()
+            available_langs = pytesseract.get_languages(config='')
+            logger.info(f"✅ Tesseract {version} available")
+            logger.info(f"📝 Available Tesseract languages: {', '.join(available_langs)}")
+        except Exception as e:
+            logger.error(f"❌ Tesseract not available: {e}")
+            if not self.paddle_available:
+                raise RuntimeError("Neither PaddleOCR nor Tesseract is available")
+
+    async def initialize_paddle_model(self, language: str):
+        """Initialize PaddleOCR model for specific language (if available)"""
+        if not self.paddle_available:
+            return None
+            
         if language not in self.paddle_models:
             try:
-                paddle_lang = self.language_codes.get(language, 'en')
+                from paddleocr import PaddleOCR
+                
+                paddle_lang = self.paddle_language_codes.get(language, 'en')
                 
                 # Run in thread pool to avoid blocking
                 loop = asyncio.get_event_loop()
@@ -81,16 +127,17 @@ class RealOCRService:
                     lambda: PaddleOCR(
                         use_angle_cls=True,
                         lang=paddle_lang,
-                        use_gpu=False,  # Set to True if GPU available
+                        use_gpu=False,  # Always use CPU for compatibility
                         show_log=False
                     )
                 )
                 
                 self.paddle_models[language] = paddle_ocr
-                logger.info(f"Initialized PaddleOCR for language: {language}")
+                logger.info(f"✅ PaddleOCR model loaded for: {language}")
+                return paddle_ocr
                 
             except Exception as e:
-                logger.error(f"Failed to initialize PaddleOCR for {language}: {e}")
+                logger.error(f"❌ Failed to load PaddleOCR for {language}: {e}")
                 return None
                 
         return self.paddle_models.get(language)
@@ -127,11 +174,11 @@ class RealOCRService:
         """Detect Malaysian document type from extracted text"""
         text_lower = text.lower()
         
-        if any(keyword in text_lower for keyword in ['mykad', 'kad pengenalan', 'identity']):
+        if any(keyword in text_lower for keyword in ['mykad', 'kad pengenalan', 'identity', 'identiti']):
             return 'mykad'
         elif any(keyword in text_lower for keyword in ['passport', 'pasport']):
             return 'passport'
-        elif any(keyword in text_lower for keyword in ['license', 'lesen']):
+        elif any(keyword in text_lower for keyword in ['license', 'lesen', 'driving']):
             return 'license'
         elif any(keyword in text_lower for keyword in ['surat', 'letter', 'memorandum']):
             return 'official_document'
@@ -154,10 +201,18 @@ class RealOCRService:
         phone_pattern = r'0(\d{1,2})\s*-?\s*(\d{7,8})'
         corrected_text = re.sub(phone_pattern, r'0\1-\2', corrected_text)
         
+        # Clean up common OCR artifacts
+        corrected_text = re.sub(r'\s+', ' ', corrected_text)  # Multiple spaces
+        corrected_text = re.sub(r'[|]', 'I', corrected_text)  # Pipe to I
+        corrected_text = corrected_text.strip()
+        
         return corrected_text
 
     async def process_with_paddle(self, image: np.ndarray, language: str) -> Optional[List]:
-        """Process image with PaddleOCR"""
+        """Process image with PaddleOCR (if available)"""
+        if not self.paddle_available:
+            return None
+            
         try:
             paddle_ocr = await self.initialize_paddle_model(language)
             if not paddle_ocr:
@@ -170,6 +225,7 @@ class RealOCRService:
                 lambda: paddle_ocr.ocr(image, cls=True)
             )
             
+            self.stats["engine_usage"]["paddleocr"] += 1
             return results[0] if results and results[0] else []
             
         except Exception as e:
@@ -177,40 +233,51 @@ class RealOCRService:
             return None
 
     def process_with_tesseract(self, image: np.ndarray, language: str) -> List:
-        """Fallback processing with Tesseract"""
+        """Process image with Tesseract OCR"""
         try:
             # Convert to PIL Image
             pil_image = Image.fromarray(image)
             
-            # Tesseract language mapping
-            tesseract_lang = {
-                'ms': 'eng',  # Use English for Bahasa Malaysia
-                'en': 'eng',
-                'zh': 'chi_sim',
-                'ta': 'tam',
-                'ar': 'ara'
-            }.get(language, 'eng')
+            # Get Tesseract language code
+            tesseract_lang = self.language_codes.get(language, 'eng')
             
-            # Extract text with bounding boxes
+            # Check if language is available
+            try:
+                available_langs = pytesseract.get_languages(config='')
+                if tesseract_lang not in available_langs:
+                    logger.warning(f"Language {tesseract_lang} not available, using 'eng'")
+                    tesseract_lang = 'eng'
+            except:
+                tesseract_lang = 'eng'  # Fallback to English
+            
+            # Custom Tesseract config for better accuracy
+            custom_config = f'--psm 6 -l {tesseract_lang}'
+            
+            # Extract text with bounding boxes and confidence
             data = pytesseract.image_to_data(
                 pil_image, 
-                lang=tesseract_lang, 
-                output_type=pytesseract.Output.DICT
+                output_type=pytesseract.Output.DICT,
+                config=custom_config
             )
             
             results = []
             for i in range(len(data['text'])):
-                if int(data['conf'][i]) > 30:  # Confidence threshold
+                confidence = int(data['conf'][i])
+                text = data['text'][i].strip()
+                
+                if confidence > 30 and text:  # Confidence threshold and non-empty text
                     x = data['left'][i]
                     y = data['top'][i]
                     w = data['width'][i]
                     h = data['height'][i]
                     
+                    # Format as PaddleOCR-style output for consistency
                     results.append([
                         [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
-                        (data['text'][i], data['conf'][i] / 100.0)
+                        (text, confidence / 100.0)
                     ])
             
+            self.stats["engine_usage"]["tesseract"] += 1
             return results
             
         except Exception as e:
@@ -239,18 +306,26 @@ class RealOCRService:
             # Preprocess image
             processed_image = self.preprocess_image(image)
             
-            # Try PaddleOCR first
-            paddle_results = await self.process_with_paddle(processed_image, language)
+            # Try PaddleOCR first (if available), then Tesseract
+            results = None
+            processing_engine = "none"
             
-            # Fallback to Tesseract if PaddleOCR fails
-            if not paddle_results:
-                logger.warning("PaddleOCR failed, using Tesseract fallback")
-                tesseract_results = self.process_with_tesseract(processed_image, language)
-                results = tesseract_results
+            if self.paddle_available:
+                logger.info("🚀 Attempting PaddleOCR processing...")
+                results = await self.process_with_paddle(processed_image, language)
+                if results:
+                    processing_engine = "paddleocr"
+                    logger.info("✅ PaddleOCR processing successful")
+            
+            if not results:
+                logger.info("🔄 Using Tesseract processing...")
+                results = self.process_with_tesseract(processed_image, language)
                 processing_engine = "tesseract"
-            else:
-                results = paddle_results
-                processing_engine = "paddleocr"
+                if results:
+                    logger.info("✅ Tesseract processing successful")
+            
+            if not results:
+                raise ValueError("No OCR engine produced results")
             
             # Extract text and bounding boxes
             extracted_text = ""
@@ -312,17 +387,18 @@ class RealOCRService:
                     "total_detections": len(results),
                     "valid_detections": valid_detections,
                     "confidence_threshold": confidence_threshold,
-                    "image_size": image.shape if image is not None else None
+                    "image_size": image.shape if image is not None else None,
+                    "paddle_available": self.paddle_available
                 },
                 "meta_learning_applied": False  # Future feature
             }
             
-            logger.info(f"OCR completed in {processing_time:.2f}s with {avg_confidence:.2f} confidence")
+            logger.info(f"🎉 OCR completed in {processing_time:.2f}s with {avg_confidence:.2f} confidence using {processing_engine}")
             return result
             
         except Exception as e:
             self.stats["error_count"] += 1
-            logger.error(f"OCR processing failed: {e}")
+            logger.error(f"❌ OCR processing failed: {e}")
             
             return {
                 "success": False,
@@ -334,7 +410,8 @@ class RealOCRService:
                 "metadata": {
                     "error": str(e),
                     "processing_engine": "none",
-                    "document_type": "unknown"
+                    "document_type": "unknown",
+                    "paddle_available": self.paddle_available
                 },
                 "meta_learning_applied": False
             }
@@ -361,9 +438,10 @@ class RealOCRService:
         """Get processing statistics"""
         return {
             **self.stats,
-            "models_loaded": list(self.paddle_models.keys()),
-            "supported_languages": list(self.language_codes.keys())
+            "paddle_available": self.paddle_available,
+            "supported_languages": list(self.language_codes.keys()),
+            "available_engines": (["paddleocr"] if self.paddle_available else []) + ["tesseract"]
         }
 
 # Global OCR service instance
-real_ocr_service = RealOCRService()
+working_ocr_service = WorkingOCRService()
