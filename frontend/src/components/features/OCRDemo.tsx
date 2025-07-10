@@ -255,13 +255,15 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,.pdf"
-              onChange={handleFileInputChange}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
+            {!selectedFile && (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,.pdf"
+                onChange={handleFileInputChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+            )}
 
             {selectedFile ? (
               <div className="space-y-4">
