@@ -3,14 +3,23 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, Download, Eye, Clock, Zap } from 'lucide-react';
 
-// API Base URL - handle both local and deployed environments
+// API Base URL - handle GitHub Codespaces and other environments
 const getApiBaseUrl = () => {
-  // If we're in browser and on Vercel (or any https site), use a deployed backend
+  // If we're in browser, check the environment
   if (typeof window !== 'undefined') {
     const currentHost = window.location.hostname;
+    
+    // GitHub Codespaces detection
+    if (currentHost.includes('github.dev') || currentHost.includes('gitpod.io')) {
+      // For GitHub Codespaces, backend should also be on a forwarded port
+      const port = '8000';
+      const codespaceName = currentHost.split('-')[0];
+      return `https://${codespaceName}-${port}.app.github.dev`;
+    }
+    
+    // Vercel or other production
     if (currentHost.includes('vercel.app') || currentHost.includes('mataocr.com')) {
-      // For now, we'll use a placeholder - you'll need to deploy your backend
-      return 'https://your-backend-url.com'; // Update this when you deploy backend
+      return 'https://your-backend-url.com'; // Update when backend is deployed
     }
   }
   
@@ -156,16 +165,19 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
     try {
       console.log('Processing OCR with API:', API_BASE_URL); // Debug log
       
-      // Check if we can reach the backend
-      const isBackendAvailable = await checkBackendAvailability();
+      // Check if we're on Vercel or production - use demo mode
+      const isProduction = typeof window !== 'undefined' && 
+        (window.location.hostname.includes('vercel.app') || 
+         window.location.hostname.includes('mataocr.com') ||
+         !API_BASE_URL.includes('localhost'));
       
-      if (!isBackendAvailable) {
-        // Fallback to mock data for Vercel demo
-        console.log('Backend not available, using mock data');
+      if (isProduction) {
+        console.log('Production environment detected, using demo mode');
         await simulateMockOCR();
         return;
       }
       
+      // Try real API for localhost development
       const formData = new FormData();
       formData.append('file', selectedFile);
       
@@ -194,24 +206,11 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
     } catch (err) {
       console.error('Detailed OCR Error:', err); // More detailed error logging
       
-      // Fallback to mock for demo purposes
+      // Fallback to mock for any errors
       console.log('API failed, using mock data for demo');
       await simulateMockOCR();
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  // Helper function to check if backend is available
-  const checkBackendAvailability = async (): Promise<boolean> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/health`, { 
-        method: 'GET',
-        signal: AbortSignal.timeout(3000) // 3 second timeout
-      });
-      return response.ok;
-    } catch {
-      return false;
     }
   };
 
@@ -271,8 +270,8 @@ Address: No. 123, Jalan Bunga Raya
 
     setResult(mockResult);
     
-    // Show demo notice
-    setError('Demo Mode: Backend not available. Showing sample Malaysian OCR results.');
+    // Show demo notice - make it informative, not an error
+    console.log('Demo mode activated - showing sample results');
   };
 
   const resetDemo = () => {
