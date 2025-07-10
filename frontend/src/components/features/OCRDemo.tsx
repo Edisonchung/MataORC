@@ -1,15 +1,16 @@
+// frontend/src/components/features/OCRDemo.tsx
 'use client';
 
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, Download, Eye, Clock, Zap } from 'lucide-react';
 
-// API Base URL - handle GitHub Codespaces and other environments
+// API Base URL - Updated to always try real API first
 const getApiBaseUrl = () => {
   // If we're in browser, check the environment
   if (typeof window !== 'undefined') {
     const currentHost = window.location.hostname;
     
-    // GitHub Codespaces detection
+    // GitHub Codespaces detection - USE REAL API
     if (currentHost.includes('github.dev') || currentHost.includes('gitpod.io')) {
       // For GitHub Codespaces, backend should also be on a forwarded port
       const port = '8000';
@@ -17,9 +18,10 @@ const getApiBaseUrl = () => {
       return `https://${codespaceName}-${port}.app.github.dev`;
     }
     
-    // Vercel or other production
+    // Production deployment
     if (currentHost.includes('vercel.app') || currentHost.includes('mataocr.com')) {
-      return 'https://your-backend-url.com'; // Update when backend is deployed
+      // Update this URL when you deploy backend to production
+      return process.env.NEXT_PUBLIC_API_URL || 'https://your-production-backend.com';
     }
   }
   
@@ -30,7 +32,7 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 console.log('API_BASE_URL:', API_BASE_URL); // Debug log
 
-// Types (simplified versions)
+// Types (matching your backend)
 interface OCRResult {
   success: boolean;
   text: string;
@@ -86,33 +88,21 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
     if (file.size > maxSize) {
       return { 
         valid: false, 
-        error: `File too large. Maximum size: ${(maxSize / 1024 / 1024).toFixed(1)}MB` 
+        error: `File too large. Maximum size is 10MB.` 
       };
     }
 
     if (!allowedTypes.includes(file.type)) {
       return { 
         valid: false, 
-        error: `File type not supported. Allowed: ${allowedTypes.join(', ')}` 
+        error: `File type not supported. Please use JPG, PNG, or PDF.` 
       };
     }
 
     return { valid: true };
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatProcessingTime = (seconds: number): string => {
-    if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
-    return `${seconds.toFixed(1)}s`;
-  };
-
+  // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -127,24 +117,21 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
     e.preventDefault();
     setIsDragging(false);
     
-    const files = Array.from(e.dataTransfer.files);
+    const files = e.dataTransfer.files;
     if (files.length > 0) {
       handleFileSelect(files[0]);
     }
   };
 
   const handleFileSelect = (file: File) => {
-    // Reset previous state
-    setError(null);
-    setResult(null);
-    
-    // Validate file
     const validation = validateFile(file);
     if (!validation.valid) {
       setError(validation.error || 'Invalid file');
       return;
     }
 
+    setError(null);
+    setResult(null);
     setSelectedFile(file);
   };
 
@@ -165,27 +152,16 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
     try {
       console.log('Processing OCR with API:', API_BASE_URL); // Debug log
       
-      // Check if we're on Vercel or production - use demo mode
-      const isProduction = typeof window !== 'undefined' && 
-        (window.location.hostname.includes('vercel.app') || 
-         window.location.hostname.includes('mataocr.com') ||
-         !API_BASE_URL.includes('localhost'));
+      // ALWAYS TRY REAL API FIRST - No more demo mode detection
+      console.log('Using real OCR API');
       
-      if (isProduction) {
-        console.log('Production environment detected, using demo mode');
-        await simulateMockOCR();
-        return;
-      }
-      
-      // Try real API for localhost development
+      // Prepare form data for file upload
       const formData = new FormData();
       formData.append('file', selectedFile);
-      
-      const params = new URLSearchParams();
-      params.append('language', selectedLanguage);
-      params.append('confidence_threshold', '0.8');
+      formData.append('language', selectedLanguage);
+      formData.append('confidence_threshold', '0.7');
 
-      const apiUrl = `${API_BASE_URL}/ocr/process?${params.toString()}`;
+      const apiUrl = `${API_BASE_URL}/ocr/process`;
       console.log('Making request to:', apiUrl); // Debug log
 
       const response = await fetch(apiUrl, {
@@ -201,26 +177,41 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
       }
 
       const ocrResult = await response.json();
-      setResult(ocrResult);
       console.log('OCR Result:', ocrResult); // For debugging
-    } catch (err) {
-      console.error('Detailed OCR Error:', err); // More detailed error logging
       
-      // Fallback to mock for any errors
-      console.log('API failed, using mock data for demo');
-      await simulateMockOCR();
+      // Validate the result structure
+      if (!ocrResult.success) {
+        throw new Error(ocrResult.error || 'OCR processing was not successful');
+      }
+
+      setResult(ocrResult);
+      
+    } catch (err) {
+      console.error('OCR Error:', err);
+      
+      // Only use mock data if API is completely unavailable
+      console.log('Real API failed, showing error instead of mock');
+      setError(`Failed to connect to OCR service: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Optional: Uncomment below to show mock data as fallback
+      // await simulateMockOCR();
+      
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Mock OCR for demo when backend isn't available
+  // Mock OCR for absolute fallback (optional)
   const simulateMockOCR = async () => {
+    console.log('Demo mode activated - showing sample results');
+    
     // Simulate processing time
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Mock Malaysian document result based on selected language
     let mockText = '';
+    let documentType = 'general';
+    
     if (selectedLanguage === 'ms') {
       mockText = `KERAJAAN MALAYSIA
 MyKad No: 123456-78-9012
@@ -229,6 +220,7 @@ Alamat: No. 123, Jalan Bunga Raya
         Taman Sri Malaysia
         50000 Kuala Lumpur
 Tarikh Lahir: 15 Ogos 1985`;
+      documentType = 'mykad';
     } else if (selectedLanguage === 'zh') {
       mockText = `马来西亚政府
 身份证号码: 123456-78-9012
@@ -236,13 +228,16 @@ Tarikh Lahir: 15 Ogos 1985`;
 地址: 马来西亚吉隆坡
      斯里马来西亚花园
      布嘉拉雅路123号`;
+      documentType = 'mykad';
     } else {
       mockText = `GOVERNMENT OF MALAYSIA
 ID Card No: 123456-78-9012
 Name: Ahmad bin Abdullah
 Address: No. 123, Jalan Bunga Raya
          Taman Sri Malaysia
-         50000 Kuala Lumpur`;
+         50000 Kuala Lumpur
+Date of Birth: 15 Aug 1985`;
+      documentType = 'mykad';
     }
 
     const mockResult: OCRResult = {
@@ -252,55 +247,48 @@ Address: No. 123, Jalan Bunga Raya
       language_detected: selectedLanguage,
       processing_time: 2.1,
       bounding_boxes: [
-        { text: "KERAJAAN MALAYSIA", bbox: [10, 10, 200, 30], confidence: 0.96 },
-        { text: `MyKad No: 123456-78-9012`, bbox: [10, 40, 250, 60], confidence: 0.93 },
-        { text: "Nama: Ahmad bin Abdullah", bbox: [10, 70, 300, 90], confidence: 0.91 }
+        {
+          text: mockText.split('\n')[0],
+          bbox: [50, 50, 300, 80],
+          confidence: 0.96
+        }
       ],
       metadata: {
         file_size: selectedFile?.size || 0,
         file_type: selectedFile?.type || 'image/jpeg',
-        processing_engine: 'demo_mode_paddleocr',
-        document_type: 'malaysian_id',
+        processing_engine: 'demo',
+        document_type: documentType,
         language_requested: selectedLanguage,
-        confidence_threshold: 0.8,
-        meta_learning_version: '1.0_demo'
+        confidence_threshold: 0.7,
+        meta_learning_version: '1.0'
       },
-      meta_learning_applied: true
+      meta_learning_applied: false
     };
 
     setResult(mockResult);
-    
-    // Show demo notice - make it informative, not an error
-    console.log('Demo mode activated - showing sample results');
   };
 
-  const resetDemo = () => {
-    setSelectedFile(null);
-    setResult(null);
-    setError(null);
-    setShowBoundingBoxes(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const downloadResult = () => {
+  const downloadResults = () => {
     if (!result) return;
 
-    const data = {
+    const downloadData = {
       extractedText: result.text,
-      confidence: result.confidence,
-      languageDetected: result.language_detected,
-      processingTime: result.processing_time,
-      metadata: result.metadata,
+      confidence: `${Math.round(result.confidence * 100)}%`,
+      language: result.language_detected,
+      processingTime: `${result.processing_time.toFixed(2)}s`,
+      documentType: result.metadata.document_type,
+      processingEngine: result.metadata.processing_engine,
+      boundingBoxes: result.bounding_boxes,
       timestamp: new Date().toISOString()
     };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(downloadData, null, 2)], { 
+      type: 'application/json' 
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `mataocr-result-${Date.now()}.json`;
+    a.download = `mataocr-results-${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -308,166 +296,150 @@ Address: No. 123, Jalan Bunga Raya
   };
 
   return (
-    <div className={`max-w-4xl mx-auto space-y-6 ${className}`}>
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-3">
-          Try MataOCR Demo
-        </h2>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Upload a Malaysian document and see our AI-powered OCR in action. 
-          Supports Bahasa Malaysia, English, Chinese, Tamil, and Jawi.
-        </p>
-      </div>
-
-      {/* Language Selector */}
-      <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Select Language
-        </label>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div className={`max-w-4xl mx-auto ${className}`}>
+      {/* Language Selection */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">Select Language</h3>
+        <div className="flex flex-wrap gap-3">
           {Object.entries(languages).map(([code, name]) => (
             <button
               key={code}
               onClick={() => setSelectedLanguage(code)}
-              className={`p-3 rounded-lg border-2 transition-all duration-200 ${
+              className={`px-4 py-2 rounded-lg border-2 transition-all ${
                 selectedLanguage === code
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
               }`}
             >
               <div className="text-sm font-medium">{name}</div>
-              <div className="text-xs text-gray-500 mt-1">{code.toUpperCase()}</div>
+              <div className="text-xs text-gray-500">{code.toUpperCase()}</div>
             </button>
           ))}
         </div>
       </div>
 
       {/* File Upload Area */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6">
-          <div
-            className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
-              isDragging
-                ? 'border-blue-400 bg-blue-50'
-                : selectedFile
-                ? 'border-green-400 bg-green-50'
-                : 'border-gray-300 hover:border-gray-400'
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {!selectedFile && (
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,.pdf"
-                onChange={handleFileInputChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-            )}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          isDragging
+            ? 'border-blue-400 bg-blue-50'
+            : selectedFile
+            ? 'border-green-300 bg-green-50'
+            : 'border-gray-300 bg-gray-50'
+        }`}
+      >
+        {selectedFile ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center">
+              <CheckCircle className="h-12 w-12 text-green-500" />
+            </div>
+            <div>
+              <div className="text-lg font-medium text-gray-900">
+                File Selected: {selectedFile.name}
+              </div>
+              <div className="text-sm text-gray-500">
+                {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • {selectedFile.type}
+              </div>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={processOCR}
+                disabled={isProcessing}
+                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                    Processing with OCR
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-5 w-5 mr-2" />
+                    Process with OCR
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Choose Different File
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center">
+              <Upload className="h-12 w-12 text-gray-400" />
+            </div>
+            <div>
+              <div className="text-lg font-medium text-gray-900">
+                Upload a Malaysian document and see our AI-powered OCR in action. Supports
+              </div>
+              <div className="text-sm text-gray-500 mt-1">
+                Bahasa Malaysia, English, Chinese, Tamil, and Jawi
+              </div>
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+            >
+              <Upload className="h-5 w-5 mr-2" />
+              Choose File
+            </button>
+            <div className="text-xs text-gray-500">
+              Drag and drop files here, or click to select • Max 10MB • JPG, PNG, PDF
+            </div>
+          </div>
+        )}
 
-            {selectedFile ? (
-              <div className="space-y-4">
-                <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">
-                    File Selected: {selectedFile.name}
-                  </h3>
-                  <p className="text-gray-500">
-                    {formatFileSize(selectedFile.size)} • {selectedFile.type}
-                  </p>
-                </div>
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={processOCR}
-                    disabled={isProcessing}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-4 w-4" />
-                        Process with OCR
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={resetDemo}
-                    className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300"
-                  >
-                    Choose Different File
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">
-                    Upload Malaysian Document
-                  </h3>
-                  <p className="text-gray-500">
-                    Drag and drop or click to select
-                  </p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    Supports: JPG, PNG, PDF (Max 10MB)
-                  </p>
-                </div>
-              </div>
-            )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf"
+          onChange={handleFileInputChange}
+          className="hidden"
+        />
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
+            <div>
+              <div className="text-sm font-medium text-red-800">Processing Error</div>
+              <div className="text-sm text-red-700 mt-1">{error}</div>
+            </div>
           </div>
         </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="border-t border-gray-200 bg-red-50 p-4">
-            <div className="flex items-center gap-3 text-red-700">
-              <AlertCircle className="h-5 w-5" />
-              <span className="font-medium">Error:</span>
-              <span>{error}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Processing Status */}
-        {isProcessing && (
-          <div className="border-t border-gray-200 bg-blue-50 p-4">
-            <div className="flex items-center gap-3 text-blue-700">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Processing with MataOCR AI Engine...</span>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Results Display */}
       {result && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+        <div className="mt-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                OCR Results
-              </h3>
-              <div className="flex items-center gap-4">
-                <div className="text-sm text-gray-500 flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  {formatProcessingTime(result.processing_time)}
+              <div className="flex items-center">
+                <FileText className="h-5 w-5 text-green-500 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-900">OCR Results</h3>
+              </div>
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                <div className="flex items-center">
+                  <Clock className="h-4 w-4 mr-1" />
+                  {result.processing_time.toFixed(1)}s
                 </div>
-                <div className="text-sm text-gray-500">
+                <div className="font-medium">
                   Confidence: {Math.round(result.confidence * 100)}%
                 </div>
                 <button
-                  onClick={downloadResult}
-                  className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  onClick={downloadResults}
+                  className="flex items-center text-blue-600 hover:text-blue-700"
                 >
-                  <Download className="h-4 w-4" />
+                  <Download className="h-4 w-4 mr-1" />
                   Download
                 </button>
               </div>
@@ -476,22 +448,22 @@ Address: No. 123, Jalan Bunga Raya
 
           <div className="p-6 space-y-6">
             {/* Metadata */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wide">Language</div>
-                <div className="font-medium">{languages[result.language_detected as keyof typeof languages] || result.language_detected}</div>
+                <div className="font-medium text-gray-500">LANGUAGE</div>
+                <div className="text-gray-900">{languages[result.language_detected as keyof typeof languages] || result.language_detected}</div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wide">Document Type</div>
-                <div className="font-medium">{result.metadata.document_type}</div>
+                <div className="font-medium text-gray-500">DOCUMENT TYPE</div>
+                <div className="text-gray-900 capitalize">{result.metadata.document_type}</div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wide">Engine</div>
-                <div className="font-medium">{result.metadata.processing_engine}</div>
+                <div className="font-medium text-gray-500">ENGINE</div>
+                <div className="text-gray-900 capitalize">{result.metadata.processing_engine}</div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wide">Meta-Learning</div>
-                <div className="font-medium text-green-600">
+                <div className="font-medium text-gray-500">META-LEARNING</div>
+                <div className="text-gray-900">
                   {result.meta_learning_applied ? 'Applied' : 'Not Applied'}
                 </div>
               </div>
@@ -541,7 +513,7 @@ Address: No. 123, Jalan Bunga Raya
   );
 };
 
-// Default export (this fixes the import issue)
+// Default export
 export default OCRDemo;
 
 // Named export for backward compatibility
