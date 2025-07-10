@@ -2,7 +2,34 @@
 
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, Download, Eye, Clock, Zap } from 'lucide-react';
-import { api, validateFile, formatFileSize, formatProcessingTime, type OCRResult } from '@/lib/api';
+
+// For now, we'll use a simplified API client until the lib is available
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// Types (simplified versions)
+interface OCRResult {
+  success: boolean;
+  text: string;
+  confidence: number;
+  language_detected: string;
+  processing_time: number;
+  bounding_boxes: Array<{
+    text: string;
+    bbox: [number, number, number, number];
+    confidence: number;
+  }>;
+  metadata: {
+    file_size: number;
+    file_type: string;
+    processing_engine: string;
+    document_type: string;
+    language_requested: string;
+    project_id?: string;
+    confidence_threshold: number;
+    meta_learning_version: string;
+  };
+  meta_learning_applied: boolean;
+}
 
 interface OCRDemoProps {
   className?: string;
@@ -25,6 +52,41 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
     zh: 'Chinese',
     ta: 'Tamil',
     ar: 'Arabic/Jawi'
+  };
+
+  // File validation
+  const validateFile = (file: File): { valid: boolean; error?: string } => {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+
+    if (file.size > maxSize) {
+      return { 
+        valid: false, 
+        error: `File too large. Maximum size: ${(maxSize / 1024 / 1024).toFixed(1)}MB` 
+      };
+    }
+
+    if (!allowedTypes.includes(file.type)) {
+      return { 
+        valid: false, 
+        error: `File type not supported. Allowed: ${allowedTypes.join(', ')}` 
+      };
+    }
+
+    return { valid: true };
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatProcessingTime = (seconds: number): string => {
+    if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
+    return `${seconds.toFixed(1)}s`;
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -77,11 +139,27 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
     setResult(null);
 
     try {
-      const ocrResult = await api.processOCR(selectedFile, {
-        language: selectedLanguage,
-        confidence_threshold: 0.8
-      });
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      
+      const params = new URLSearchParams();
+      params.append('language', selectedLanguage);
+      params.append('confidence_threshold', '0.8');
 
+      const response = await fetch(
+        `${API_BASE_URL}/ocr/process?${params.toString()}`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `OCR Processing failed: ${response.status}`);
+      }
+
+      const ocrResult = await response.json();
       setResult(ocrResult);
       console.log('OCR Result:', ocrResult); // For debugging
     } catch (err) {
@@ -358,4 +436,8 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
   );
 };
 
+// Default export (this fixes the import issue)
 export default OCRDemo;
+
+// Named export for backward compatibility
+export { OCRDemo };
