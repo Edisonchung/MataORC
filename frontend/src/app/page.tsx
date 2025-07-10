@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { OCRDemo } from '@/components/features/OCRDemo'
+import OCRDemo from '@/components/features/OCRDemo'  // Changed to default import
 import { LanguageSelector } from '@/components/features/LanguageSelector'
 
 export default function HomePage() {
@@ -36,7 +36,7 @@ export default function HomePage() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <Card className="bg-white/10 backdrop-blur text-white border-white/20">
-              <div className="text-3xl mb-4">��</div>
+              <div className="text-3xl mb-4">🌏</div>
               <h3 className="text-lg font-semibold mb-2">Multi-Language</h3>
               <p className="text-sm text-gray-200">
                 Native support for Malaysian languages and scripts
