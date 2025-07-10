@@ -1,6 +1,6 @@
 {
   "name": "mataocr-frontend",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "description": "MataOCR - See Better, Read Smarter. AI-powered OCR for Southeast Asia.",
   "keywords": [
@@ -9,25 +9,17 @@
     "ai",
     "document-processing",
     "malaysia",
-    "southeast-asia",
-    "mata-ocr"
+    "southeast-asia"
   ],
   "author": "VisionTech Malaysia",
   "license": "MIT",
   "homepage": "https://mataocr.com",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Edisonchung/MataORC.git"
-  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@vercel/analytics": "^1.1.1",
