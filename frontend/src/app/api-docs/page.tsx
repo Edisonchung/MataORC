@@ -46,7 +46,7 @@ export default function APIDocsPage() {
   ];
 
   const codeExamples = {
-    curl: `curl -X POST https://mataocr-production.up.railway.app/ocr \\
+    curl: `curl -X POST https://api.mataocr.com/ocr \\
   -H "Content-Type: multipart/form-data" \\
   -F "file=@document.jpg" \\
   -F "language=ms" \\
@@ -57,7 +57,7 @@ formData.append('file', fileInput.files[0]);
 formData.append('language', 'ms');
 formData.append('confidence_threshold', '0.7');
 
-const response = await fetch('https://mataocr-production.up.railway.app/ocr', {
+const response = await fetch('https://api.mataocr.com/ocr', {
   method: 'POST',
   body: formData
 });
@@ -67,7 +67,7 @@ console.log(result);`,
 
     python: `import requests
 
-url = 'https://mataocr-production.up.railway.app/ocr'
+url = 'https://api.mataocr.com/ocr'
 files = {'file': open('document.jpg', 'rb')}
 data = {
     'language': 'ms',
@@ -82,7 +82,7 @@ print(result)`,
 $curl = curl_init();
 
 curl_setopt_array($curl, array(
-    CURLOPT_URL => 'https://mataocr-production.up.railway.app/ocr',
+    CURLOPT_URL => 'https://api.mataocr.com/ocr',
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST => true,
     CURLOPT_POSTFIELDS => array(
@@ -138,7 +138,7 @@ print_r($result);
             </div>
             <div className="flex items-center space-x-4">
               <Link 
-                href="https://mataocr-production.up.railway.app/docs"
+                href="https://api.mataocr.com/docs"
                 className="text-blue-600 hover:text-blue-700 flex items-center"
                 target="_blank"
               >
@@ -251,7 +251,7 @@ print_r($result);
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">Base URL</h3>
                     <div className="bg-gray-900 rounded-lg p-4">
-                      <code className="text-green-400">https://mataocr-production.up.railway.app</code>
+                      <code className="text-green-400">https://api.mataocr.com</code>
                     </div>
                   </div>
                 </div>
