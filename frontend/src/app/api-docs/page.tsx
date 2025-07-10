@@ -1,4 +1,3 @@
-// src/app/api-docs/page.tsx - Complete API Documentation
 'use client';
 
 import React, { useState } from 'react';
@@ -10,13 +9,11 @@ import {
   Code, 
   FileText, 
   Zap, 
-  Shield,
   ExternalLink,
-  Play,
-  Download,
   Book,
   Terminal,
-  Globe
+  Globe,
+  Shield
 } from 'lucide-react';
 
 export default function APIDocsPage() {
@@ -37,8 +34,7 @@ export default function APIDocsPage() {
     { id: 'overview', label: 'Overview', icon: <Book className="w-4 h-4" /> },
     { id: 'quickstart', label: 'Quick Start', icon: <Zap className="w-4 h-4" /> },
     { id: 'endpoints', label: 'API Reference', icon: <Terminal className="w-4 h-4" /> },
-    { id: 'examples', label: 'Examples', icon: <Code className="w-4 h-4" /> },
-    { id: 'sdks', label: 'SDKs', icon: <Download className="w-4 h-4" /> }
+    { id: 'examples', label: 'Examples', icon: <Code className="w-4 h-4" /> }
   ];
 
   const languages = [
@@ -46,42 +42,11 @@ export default function APIDocsPage() {
     { id: 'en', name: 'English', flag: '🇺🇸' },
     { id: 'zh', name: 'Chinese (Simplified)', flag: '🇨🇳' },
     { id: 'ta', name: 'Tamil', flag: '🇮🇳' },
-    { id: 'ar', name: 'Arabic/Jawi', flag: '🇸🇦' }
-  ];
-
-  const endpoints = [
-    {
-      method: 'POST',
-      path: '/ocr',
-      description: 'Process image for OCR text extraction',
-      parameters: [
-        { name: 'file', type: 'File', required: true, description: 'Image file (JPG, PNG, etc.)' },
-        { name: 'language', type: 'string', required: false, description: 'Language code (ms, en, zh, ta, ar)' },
-        { name: 'confidence_threshold', type: 'float', required: false, description: 'Minimum confidence (0.0-1.0)' }
-      ]
-    },
-    {
-      method: 'GET',
-      path: '/health',
-      description: 'Check API health status',
-      parameters: []
-    },
-    {
-      method: 'GET',
-      path: '/languages',
-      description: 'Get supported languages',
-      parameters: []
-    },
-    {
-      method: 'GET',
-      path: '/stats',
-      description: 'Get processing statistics',
-      parameters: []
-    }
+    { id: 'ar', name: 'Arabic/Jawi', flag: '🕌' }
   ];
 
   const codeExamples = {
-    curl: `curl -X POST https://api.mataocr.com/ocr \\
+    curl: `curl -X POST https://mataocr-production.up.railway.app/ocr \\
   -H "Content-Type: multipart/form-data" \\
   -F "file=@document.jpg" \\
   -F "language=ms" \\
@@ -92,7 +57,7 @@ formData.append('file', fileInput.files[0]);
 formData.append('language', 'ms');
 formData.append('confidence_threshold', '0.7');
 
-const response = await fetch('https://api.mataocr.com/ocr', {
+const response = await fetch('https://mataocr-production.up.railway.app/ocr', {
   method: 'POST',
   body: formData
 });
@@ -102,7 +67,7 @@ console.log(result);`,
 
     python: `import requests
 
-url = 'https://api.mataocr.com/ocr'
+url = 'https://mataocr-production.up.railway.app/ocr'
 files = {'file': open('document.jpg', 'rb')}
 data = {
     'language': 'ms',
@@ -117,7 +82,7 @@ print(result)`,
 $curl = curl_init();
 
 curl_setopt_array($curl, array(
-    CURLOPT_URL => 'https://api.mataocr.com/ocr',
+    CURLOPT_URL => 'https://mataocr-production.up.railway.app/ocr',
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST => true,
     CURLOPT_POSTFIELDS => array(
@@ -137,7 +102,7 @@ print_r($result);
 
   const responseExample = `{
   "success": true,
-  "text": "MALAYSIA\\nMYKAD\\n123456-78-9012\\nAHMAD BIN ALI\\nLAKI-LAKI",
+  "text": "MALAYSIA\\nMYKAD\\n123456-78-9012\\nAHMAD BIN ALI",
   "confidence": 0.942,
   "language_detected": "ms",
   "processing_time": 1.35,
@@ -181,10 +146,10 @@ print_r($result);
                 Interactive Docs
               </Link>
               <Link 
-                href="/dashboard"
+                href="/pricing"
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
               >
-                Dashboard
+                View Pricing
               </Link>
             </div>
           </div>
@@ -212,7 +177,7 @@ print_r($result);
               ))}
             </nav>
 
-            {/* Quick Stats */}
+            {/* API Status */}
             <div className="mt-8 bg-white rounded-lg p-4 border">
               <h3 className="font-semibold text-gray-900 mb-3">API Status</h3>
               <div className="space-y-2 text-sm">
@@ -220,20 +185,16 @@ print_r($result);
                   <span className="text-gray-600">Status</span>
                   <span className="text-green-600 flex items-center">
                     <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                    Operational
+                    Live
                   </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Uptime</span>
-                  <span className="text-gray-900">99.9%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Avg Response</span>
-                  <span className="text-gray-900">1.3s</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Version</span>
                   <span className="text-gray-900">v2.0.0</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Uptime</span>
+                  <span className="text-gray-900">100%</span>
                 </div>
               </div>
             </div>
@@ -258,17 +219,17 @@ print_r($result);
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
                       <Zap className="w-8 h-8 text-blue-600 mx-auto mb-2" />
                       <h3 className="font-semibold text-gray-900">Lightning Fast</h3>
-                      <p className="text-sm text-gray-600">Average processing time under 2 seconds</p>
+                      <p className="text-sm text-gray-600">Processing under 2 seconds</p>
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <Shield className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                      <h3 className="font-semibold text-gray-900">Secure & Compliant</h3>
-                      <p className="text-sm text-gray-600">PDPA compliant with data sovereignty</p>
+                      <h3 className="font-semibold text-gray-900">PDPA Compliant</h3>
+                      <p className="text-sm text-gray-600">Data sovereignty guaranteed</p>
                     </div>
                     <div className="text-center p-4 bg-purple-50 rounded-lg">
                       <Globe className="w-8 h-8 text-purple-600 mx-auto mb-2" />
                       <h3 className="font-semibold text-gray-900">Multi-Language</h3>
-                      <p className="text-sm text-gray-600">5 Southeast Asian languages supported</p>
+                      <p className="text-sm text-gray-600">5 Southeast Asian languages</p>
                     </div>
                   </div>
 
@@ -290,7 +251,7 @@ print_r($result);
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">Base URL</h3>
                     <div className="bg-gray-900 rounded-lg p-4">
-                      <code className="text-green-400">https://api.mataocr.com</code>
+                      <code className="text-green-400">https://mataocr-production.up.railway.app</code>
                     </div>
                   </div>
                 </div>
@@ -336,16 +297,6 @@ print_r($result);
                         </pre>
                       </div>
                     </div>
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-blue-900 mb-2">💡 Pro Tips</h4>
-                      <ul className="text-sm text-blue-800 space-y-1">
-                        <li>• Use language parameter for better accuracy</li>
-                        <li>• Adjust confidence_threshold based on your needs</li>
-                        <li>• MyKad and passport images work best in landscape orientation</li>
-                        <li>• Ensure good lighting and minimal glare for optimal results</li>
-                      </ul>
-                    </div>
                   </div>
                 </div>
               )}
@@ -355,59 +306,59 @@ print_r($result);
                 <div className="space-y-8">
                   <div>
                     <h2 className="text-3xl font-bold text-gray-900 mb-4">API Reference</h2>
-                    <p className="text-lg text-gray-600">
-                      Complete reference for all available endpoints
-                    </p>
+                    <p className="text-lg text-gray-600">Complete reference for all endpoints</p>
                   </div>
 
-                  <div className="space-y-8">
-                    {endpoints.map((endpoint, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-6">
-                        <div className="flex items-center space-x-3 mb-4">
-                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                            endpoint.method === 'POST' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {endpoint.method}
-                          </span>
-                          <code className="text-lg font-mono text-gray-900">{endpoint.path}</code>
-                        </div>
-                        <p className="text-gray-600 mb-4">{endpoint.description}</p>
-                        
-                        {endpoint.parameters.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-3">Parameters</h4>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="border-b">
-                                    <th className="text-left py-2">Name</th>
-                                    <th className="text-left py-2">Type</th>
-                                    <th className="text-left py-2">Required</th>
-                                    <th className="text-left py-2">Description</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {endpoint.parameters.map((param, paramIndex) => (
-                                    <tr key={paramIndex} className="border-b">
-                                      <td className="py-2 font-mono text-blue-600">{param.name}</td>
-                                      <td className="py-2 text-gray-600">{param.type}</td>
-                                      <td className="py-2">
-                                        <span className={`px-2 py-1 rounded text-xs ${
-                                          param.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'
-                                        }`}>
-                                          {param.required ? 'Required' : 'Optional'}
-                                        </span>
-                                      </td>
-                                      <td className="py-2 text-gray-600">{param.description}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
+                  <div className="border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <span className="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                        POST
+                      </span>
+                      <code className="text-lg font-mono text-gray-900">/ocr</code>
+                    </div>
+                    <p className="text-gray-600 mb-4">Process image for OCR text extraction</p>
+                    
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-3">Parameters</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-2">Name</th>
+                              <th className="text-left py-2">Type</th>
+                              <th className="text-left py-2">Required</th>
+                              <th className="text-left py-2">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="py-2 font-mono text-blue-600">file</td>
+                              <td className="py-2 text-gray-600">File</td>
+                              <td className="py-2">
+                                <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">Required</span>
+                              </td>
+                              <td className="py-2 text-gray-600">Image file (JPG, PNG, etc.)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 font-mono text-blue-600">language</td>
+                              <td className="py-2 text-gray-600">string</td>
+                              <td className="py-2">
+                                <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-600">Optional</span>
+                              </td>
+                              <td className="py-2 text-gray-600">Language code (ms, en, zh, ta, ar)</td>
+                            </tr>
+                            <tr>
+                              <td className="py-2 font-mono text-blue-600">confidence_threshold</td>
+                              <td className="py-2 text-gray-600">float</td>
+                              <td className="py-2">
+                                <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-600">Optional</span>
+                              </td>
+                              <td className="py-2 text-gray-600">Minimum confidence (0.0-1.0)</td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -417,9 +368,7 @@ print_r($result);
                 <div className="space-y-8">
                   <div>
                     <h2 className="text-3xl font-bold text-gray-900 mb-4">Code Examples</h2>
-                    <p className="text-lg text-gray-600">
-                      Ready-to-use code examples in popular programming languages
-                    </p>
+                    <p className="text-lg text-gray-600">Ready-to-use examples in popular languages</p>
                   </div>
 
                   <div className="space-y-8">
@@ -439,99 +388,6 @@ print_r($result);
                         </div>
                       </div>
                     ))}
-                  </div>
-                </div>
-              )}
-
-              {/* SDKs Tab */}
-              {activeTab === 'sdks' && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-4">SDKs & Libraries</h2>
-                    <p className="text-lg text-gray-600">
-                      Official and community SDKs for easy integration
-                    </p>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="border border-gray-200 rounded-lg p-6">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">JS</span>
-                        </div>
-                        <h3 className="text-lg font-semibold">JavaScript SDK</h3>
-                      </div>
-                      <p className="text-gray-600 mb-4">Official JavaScript/TypeScript SDK for web and Node.js</p>
-                      <div className="bg-gray-100 rounded p-2 mb-4">
-                        <code className="text-sm">npm install mataocr-js</code>
-                      </div>
-                      <button className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
-                        Coming Soon
-                      </button>
-                    </div>
-
-                    <div className="border border-gray-200 rounded-lg p-6">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">PY</span>
-                        </div>
-                        <h3 className="text-lg font-semibold">Python SDK</h3>
-                      </div>
-                      <p className="text-gray-600 mb-4">Official Python SDK with async support</p>
-                      <div className="bg-gray-100 rounded p-2 mb-4">
-                        <code className="text-sm">pip install mataocr-python</code>
-                      </div>
-                      <button className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
-                        Coming Soon
-                      </button>
-                    </div>
-
-                    <div className="border border-gray-200 rounded-lg p-6">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">PHP</span>
-                        </div>
-                        <h3 className="text-lg font-semibold">PHP SDK</h3>
-                      </div>
-                      <p className="text-gray-600 mb-4">Official PHP SDK with Laravel support</p>
-                      <div className="bg-gray-100 rounded p-2 mb-4">
-                        <code className="text-sm">composer require mataocr/php-sdk</code>
-                      </div>
-                      <button className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
-                        Coming Soon
-                      </button>
-                    </div>
-
-                    <div className="border border-gray-200 rounded-lg p-6">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">GO</span>
-                        </div>
-                        <h3 className="text-lg font-semibold">Go SDK</h3>
-                      </div>
-                      <p className="text-gray-600 mb-4">Official Go SDK for high-performance applications</p>
-                      <div className="bg-gray-100 rounded p-2 mb-4">
-                        <code className="text-sm">go get github.com/mataocr/go-sdk</code>
-                      </div>
-                      <button className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
-                        Coming Soon
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                    <h3 className="font-semibold text-blue-900 mb-2">Need an SDK for your language?</h3>
-                    <p className="text-blue-800 mb-4">
-                      We're actively developing SDKs for popular programming languages. 
-                      Let us know what you need!
-                    </p>
-                    <Link 
-                      href="/contact"
-                      className="inline-flex items-center text-blue-600 hover:text-blue-700 font-semibold"
-                    >
-                      Request SDK
-                      <ArrowLeft className="w-4 h-4 ml-1 rotate-180" />
-                    </Link>
                   </div>
                 </div>
               )}
