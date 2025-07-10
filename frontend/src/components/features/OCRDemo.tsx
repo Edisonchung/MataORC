@@ -29,7 +29,7 @@ const getApiBaseUrl = () => {
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 };
 
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = "https://ubiquitous-enigma-r4qprr5qpgfjg9-8000.app.github.dev";
 console.log('API_BASE_URL:', API_BASE_URL); // Debug log
 
 // Types (matching your backend)
