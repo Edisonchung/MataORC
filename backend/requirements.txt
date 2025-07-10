@@ -1,47 +1,48 @@
-# MataOCR Backend - Minimal Working Dependencies
-# Start with these, then add advanced features incrementally
+# MataOCR Backend - Production Requirements with Real OCR
 
-# === CORE FASTAPI (Required Now) ===
+# === CORE FASTAPI (Working) ===
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 pydantic==2.5.0
-
-# === FILE HANDLING (Required Now) ===
 aiofiles==23.2.1
-python-magic==0.4.27
 
-# === BASIC OCR (Add Next Week) ===
-# paddlepaddle==2.5.2
-# paddleocr==2.7.0.3
-# opencv-python==4.8.1.78
-# pillow==10.1.0
+# === REAL OCR ENGINES ===
+# PaddleOCR (Primary - Excellent for Asian languages)
+paddlepaddle==2.5.2
+paddleocr==2.7.0.3
 
-# === DATABASE (Add Week 2) ===
-# sqlalchemy==2.0.23
-# psycopg2-binary==2.9.9
-# alembic==1.12.1
+# Tesseract (Fallback)
+pytesseract==0.3.10
 
-# === ADVANCED AI FEATURES (Add Later) ===
-# torch==2.1.1
-# torchvision==0.16.1
-# transformers==4.35.2
-# scikit-learn==1.3.2
-# numpy==1.24.3
+# === IMAGE PROCESSING ===
+opencv-python==4.8.1.78
+pillow==10.1.0
+numpy==1.24.3
+albumentations==1.3.1
+imageio==2.31.6
 
-# === AUTHENTICATION (Add Week 3) ===
-# python-jose[cryptography]==3.3.0
-# passlib[bcrypt]==1.7.4
-# bcrypt==4.1.1
-
-# === CLOUD STORAGE (Add Week 4) ===
-# minio==7.2.0
-# boto3==1.34.0
-
-# === MONITORING (Production) ===
-# prometheus-client==0.19.0
-# structlog==23.2.0
+# === PERFORMANCE & ASYNC ===
+asyncio-extras==1.3.2
 
 # === DEVELOPMENT TOOLS ===
 pytest==7.4.3
 pytest-asyncio==0.21.1
+
+# === FUTURE ADDITIONS (Commented out for now) ===
+# Database
+# sqlalchemy==2.0.23
+# psycopg2-binary==2.9.9
+# alembic==1.12.1
+
+# Authentication
+# python-jose[cryptography]==3.3.0
+# passlib[bcrypt]==1.7.4
+
+# Cloud Storage
+# minio==7.2.0
+# boto3==1.34.0
+
+# Monitoring
+# prometheus-client==0.19.0
+# structlog==23.2.0
