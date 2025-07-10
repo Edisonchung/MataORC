@@ -1,4 +1,4 @@
-# backend/Dockerfile - Corrected for Railway
+# backend/Dockerfile - Fixed PORT issue
 FROM python:3.11-slim
 
 # Install system dependencies for OpenCV, PaddleOCR, and compilation
@@ -68,8 +68,16 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p uploads
 
+# Create a startup script that properly handles the PORT environment variable
+RUN echo '#!/bin/bash\n\
+echo "Starting MataOCR API..."\n\
+echo "Environment: $ENVIRONMENT"\n\
+echo "Port: $PORT"\n\
+exec python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}\n\
+' > start.sh && chmod +x start.sh
+
 # Expose port (Railway will provide this via $PORT)
 EXPOSE $PORT
 
-# Start command
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+# Use the startup script instead of direct uvicorn command
+CMD ["./start.sh"]
