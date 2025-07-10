@@ -1,470 +1,541 @@
-// src/app/api-docs/page.tsx - Fixed version
+// src/app/api-docs/page.tsx - Complete API Documentation
 'use client';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { 
-  Code, 
+  ArrowLeft, 
   Copy, 
-  Check, 
-  ArrowLeft,
-  FileText,
-  Zap,
+  CheckCircle, 
+  Code, 
+  FileText, 
+  Zap, 
   Shield,
-  Globe,
-  Terminal,
+  ExternalLink,
+  Play,
+  Download,
   Book,
-  ExternalLink
+  Terminal,
+  Globe
 } from 'lucide-react';
 
 export default function APIDocsPage() {
+  const [activeTab, setActiveTab] = useState('overview');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [activeLanguage, setActiveLanguage] = useState('javascript');
 
-  const copyToClipboard = (code: string, id: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(id);
-    setTimeout(() => setCopiedCode(null), 2000);
-  };
-
-  const codeExamples = {
-    javascript: {
-      setup: `// Install the MataOCR SDK
-npm install @mataocr/sdk
-
-// Initialize the client
-import { MataOCR } from '@mataocr/sdk';
-
-const client = new MataOCR({
-  apiKey: 'your-api-key-here',
-  baseURL: 'https://api.mataocr.com/v1'
-});`,
-      
-      basicOCR: `// Basic OCR processing
-const processDocument = async (file) => {
-  try {
-    const result = await client.process({
-      file: file,
-      language: 'ms', // Bahasa Malaysia
-      confidence_threshold: 0.85
-    });
-    
-    console.log('Extracted text:', result.text);
-    console.log('Accuracy:', result.confidence);
-    console.log('Processing time:', result.processing_time);
-    
-    return result;
-  } catch (error) {
-    console.error('OCR failed:', error.message);
-  }
-};`,
-      
-      batchProcessing: `// Batch processing multiple documents
-const processBatch = async (files) => {
-  const results = await Promise.all(
-    files.map(file => client.process({
-      file: file,
-      language: 'auto', // Auto-detect language
-      project_id: 'invoice-processing'
-    }))
-  );
-  
-  return results.filter(result => result.success);
-};`,
-      
-      webhooks: `// Webhook integration for async processing
-const express = require('express');
-const app = express();
-
-app.post('/webhook/mataocr', (req, res) => {
-  const { document_id, status, result } = req.body;
-  
-  if (status === 'completed') {
-    console.log('Document processed:', document_id);
-    console.log('Extracted text:', result.text);
-    
-    // Process the result in your application
-    saveToDatabase(document_id, result);
-  }
-  
-  res.status(200).send('OK');
-});`
-    },
-    
-    python: {
-      setup: `# Install the MataOCR Python SDK
-pip install mataocr-python
-
-# Initialize the client
-from mataocr import MataOCR
-
-client = MataOCR(
-    api_key="your-api-key-here",
-    base_url="https://api.mataocr.com/v1"
-)`,
-      
-      basicOCR: `# Basic OCR processing
-import asyncio
-
-async def process_document(file_path):
-    try:
-        with open(file_path, 'rb') as file:
-            result = await client.process(
-                file=file,
-                language='ms',  # Bahasa Malaysia
-                confidence_threshold=0.85
-            )
-        
-        print(f"Extracted text: {result.text}")
-        print(f"Accuracy: {result.confidence}")
-        print(f"Processing time: {result.processing_time}s")
-        
-        return result
-    except Exception as error:
-        print(f"OCR failed: {error}")`,
-      
-      batchProcessing: `# Batch processing with asyncio
-async def process_batch(file_paths):
-    tasks = []
-    for file_path in file_paths:
-        task = client.process(
-            file=open(file_path, 'rb'),
-            language='auto',
-            project_id='invoice-processing'
-        )
-        tasks.append(task)
-    
-    results = await asyncio.gather(*tasks)
-    return [r for r in results if r.success]`,
-      
-      webhooks: `# Flask webhook handler
-from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-
-@app.route('/webhook/mataocr', methods=['POST'])
-def handle_webhook():
-    data = request.json
-    document_id = data.get('document_id')
-    status = data.get('status')
-    result = data.get('result')
-    
-    if status == 'completed':
-        print(f"Document processed: {document_id}")
-        print(f"Extracted text: {result['text']}")
-        
-        # Process the result
-        save_to_database(document_id, result)
-    
-    return jsonify({"status": "success"})`
-    },
-    
-    curl: {
-      setup: `# Direct API calls with cURL
-# Set your API key as environment variable
-export MATAOCR_API_KEY="your-api-key-here"`,
-      
-      basicOCR: `# Upload and process a document
-curl -X POST "https://api.mataocr.com/v1/process" \\
-  -H "Authorization: Bearer $MATAOCR_API_KEY" \\
-  -H "Content-Type: multipart/form-data" \\
-  -F "file=@/path/to/document.pdf" \\
-  -F "language=ms" \\
-  -F "confidence_threshold=0.85"`,
-      
-      batchProcessing: `# Get processing status
-curl -X GET "https://api.mataocr.com/v1/status/doc_123" \\
-  -H "Authorization: Bearer $MATAOCR_API_KEY"
-  
-# Get supported languages
-curl -X GET "https://api.mataocr.com/v1/languages" \\
-  -H "Authorization: Bearer $MATAOCR_API_KEY"`,
-      
-      webhooks: `# Configure webhook endpoint
-curl -X POST "https://api.mataocr.com/v1/webhooks" \\
-  -H "Authorization: Bearer $MATAOCR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "url": "https://yourapp.com/webhook/mataocr",
-    "events": ["document.completed", "document.failed"]
-  }'`
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedCode(id);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
   };
 
-  const features = [
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: <Book className="w-4 h-4" /> },
+    { id: 'quickstart', label: 'Quick Start', icon: <Zap className="w-4 h-4" /> },
+    { id: 'endpoints', label: 'API Reference', icon: <Terminal className="w-4 h-4" /> },
+    { id: 'examples', label: 'Examples', icon: <Code className="w-4 h-4" /> },
+    { id: 'sdks', label: 'SDKs', icon: <Download className="w-4 h-4" /> }
+  ];
+
+  const languages = [
+    { id: 'ms', name: 'Bahasa Malaysia', flag: '🇲🇾' },
+    { id: 'en', name: 'English', flag: '🇺🇸' },
+    { id: 'zh', name: 'Chinese (Simplified)', flag: '🇨🇳' },
+    { id: 'ta', name: 'Tamil', flag: '🇮🇳' },
+    { id: 'ar', name: 'Arabic/Jawi', flag: '🇸🇦' }
+  ];
+
+  const endpoints = [
     {
-      icon: <Zap className="w-6 h-6 text-yellow-500" />,
-      title: "Fast Processing",
-      description: "Sub-2 second processing with real-time results"
+      method: 'POST',
+      path: '/ocr',
+      description: 'Process image for OCR text extraction',
+      parameters: [
+        { name: 'file', type: 'File', required: true, description: 'Image file (JPG, PNG, etc.)' },
+        { name: 'language', type: 'string', required: false, description: 'Language code (ms, en, zh, ta, ar)' },
+        { name: 'confidence_threshold', type: 'float', required: false, description: 'Minimum confidence (0.0-1.0)' }
+      ]
     },
     {
-      icon: <Shield className="w-6 h-6 text-green-500" />,
-      title: "Secure & Compliant",
-      description: "PDPA compliant with enterprise-grade security"
+      method: 'GET',
+      path: '/health',
+      description: 'Check API health status',
+      parameters: []
     },
     {
-      icon: <Globe className="w-6 h-6 text-blue-500" />,
-      title: "Multi-Language",
-      description: "Support for 5 Southeast Asian languages"
+      method: 'GET',
+      path: '/languages',
+      description: 'Get supported languages',
+      parameters: []
     },
     {
-      icon: <FileText className="w-6 h-6 text-purple-500" />,
-      title: "Document Types",
-      description: "Invoices, contracts, receipts, and more"
+      method: 'GET',
+      path: '/stats',
+      description: 'Get processing statistics',
+      parameters: []
     }
   ];
+
+  const codeExamples = {
+    curl: `curl -X POST https://api.mataocr.com/ocr \\
+  -H "Content-Type: multipart/form-data" \\
+  -F "file=@document.jpg" \\
+  -F "language=ms" \\
+  -F "confidence_threshold=0.7"`,
+    
+    javascript: `const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+formData.append('language', 'ms');
+formData.append('confidence_threshold', '0.7');
+
+const response = await fetch('https://api.mataocr.com/ocr', {
+  method: 'POST',
+  body: formData
+});
+
+const result = await response.json();
+console.log(result);`,
+
+    python: `import requests
+
+url = 'https://api.mataocr.com/ocr'
+files = {'file': open('document.jpg', 'rb')}
+data = {
+    'language': 'ms',
+    'confidence_threshold': 0.7
+}
+
+response = requests.post(url, files=files, data=data)
+result = response.json()
+print(result)`,
+
+    php: `<?php
+$curl = curl_init();
+
+curl_setopt_array($curl, array(
+    CURLOPT_URL => 'https://api.mataocr.com/ocr',
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => array(
+        'file' => new CURLFile('document.jpg'),
+        'language' => 'ms',
+        'confidence_threshold' => '0.7'
+    ),
+));
+
+$response = curl_exec($curl);
+curl_close($curl);
+
+$result = json_decode($response, true);
+print_r($result);
+?>`
+  };
+
+  const responseExample = `{
+  "success": true,
+  "text": "MALAYSIA\\nMYKAD\\n123456-78-9012\\nAHMAD BIN ALI\\nLAKI-LAKI",
+  "confidence": 0.942,
+  "language_detected": "ms",
+  "processing_time": 1.35,
+  "bounding_boxes": [
+    {
+      "text": "MALAYSIA",
+      "bbox": [45, 23, 156, 67],
+      "confidence": 0.98
+    }
+  ],
+  "metadata": {
+    "file_size": 245760,
+    "file_type": "image/jpeg",
+    "filename": "mykad.jpg",
+    "processing_engine": "paddleocr",
+    "service_version": "2.0.0"
+  }
+}`;
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex items-center justify-between py-4">
             <div className="flex items-center space-x-4">
               <Link href="/" className="flex items-center space-x-2 text-blue-600 hover:text-blue-700">
                 <ArrowLeft className="w-5 h-5" />
                 <span className="font-semibold">Back to MataOCR</span>
               </Link>
               <div className="h-6 w-px bg-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">API Documentation</h1>
+              <h1 className="text-2xl font-bold text-gray-900">API Documentation</h1>
             </div>
-            
             <div className="flex items-center space-x-4">
-              <Link href="/pricing" className="text-gray-600 hover:text-gray-900">Pricing</Link>
-              <a 
-                href="https://docs.mataocr.com" 
+              <Link 
+                href="https://mataocr-production.up.railway.app/docs"
+                className="text-blue-600 hover:text-blue-700 flex items-center"
                 target="_blank"
-                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
               >
-                <Book className="w-4 h-4" />
-                <span>Full Docs</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+                <ExternalLink className="w-4 h-4 mr-1" />
+                Interactive Docs
+              </Link>
+              <Link 
+                href="/dashboard"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              >
+                Dashboard
+              </Link>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            MataOCR API Documentation
-          </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Integrate powerful Malaysian OCR capabilities into your applications with our simple REST API.
-            Process documents in multiple languages with industry-leading accuracy.
-          </p>
-        </div>
-
-        {/* Features */}
-        <div className="grid md:grid-cols-4 gap-6 mb-12">
-          {features.map((feature, index) => (
-            <div key={index} className="bg-white rounded-lg p-6 shadow-sm border text-center">
-              <div className="flex justify-center mb-4">
-                {feature.icon}
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">{feature.title}</h3>
-              <p className="text-sm text-gray-600">{feature.description}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Quick Start */}
-        <div className="bg-white rounded-lg shadow-sm border mb-12">
-          <div className="p-6 border-b">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Quick Start</h2>
-            <p className="text-gray-600">Get started with MataOCR API in minutes</p>
-          </div>
-          
-          {/* Language Selector */}
-          <div className="p-6 border-b">
-            <div className="flex space-x-4">
-              {Object.keys(codeExamples).map((lang) => (
+        <div className="grid lg:grid-cols-4 gap-8">
+          {/* Sidebar Navigation */}
+          <div className="lg:col-span-1">
+            <nav className="space-y-1">
+              {tabs.map((tab) => (
                 <button
-                  key={lang}
-                  onClick={() => setActiveLanguage(lang)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    activeLanguage === lang
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-left transition-colors ${
+                    activeTab === tab.id
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
-                  {lang === 'javascript' ? 'JavaScript' : lang === 'python' ? 'Python' : 'cURL'}
+                  {tab.icon}
+                  <span>{tab.label}</span>
                 </button>
               ))}
-            </div>
-          </div>
+            </nav>
 
-          {/* Code Examples */}
-          <div className="p-6 space-y-8">
-            {/* Setup */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">1. Setup</h3>
-              <div className="relative">
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                  <code>{codeExamples[activeLanguage as keyof typeof codeExamples].setup}</code>
-                </pre>
-                <button
-                  onClick={() => copyToClipboard(codeExamples[activeLanguage as keyof typeof codeExamples].setup, 'setup')}
-                  className="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
-                >
-                  {copiedCode === 'setup' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Basic OCR */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">2. Basic OCR Processing</h3>
-              <div className="relative">
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                  <code>{codeExamples[activeLanguage as keyof typeof codeExamples].basicOCR}</code>
-                </pre>
-                <button
-                  onClick={() => copyToClipboard(codeExamples[activeLanguage as keyof typeof codeExamples].basicOCR, 'basic')}
-                  className="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
-                >
-                  {copiedCode === 'basic' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Batch Processing */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">3. Batch Processing</h3>
-              <div className="relative">
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                  <code>{codeExamples[activeLanguage as keyof typeof codeExamples].batchProcessing}</code>
-                </pre>
-                <button
-                  onClick={() => copyToClipboard(codeExamples[activeLanguage as keyof typeof codeExamples].batchProcessing, 'batch')}
-                  className="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
-                >
-                  {copiedCode === 'batch' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Webhooks */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">4. Webhook Integration</h3>
-              <div className="relative">
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                  <code>{codeExamples[activeLanguage as keyof typeof codeExamples].webhooks}</code>
-                </pre>
-                <button
-                  onClick={() => copyToClipboard(codeExamples[activeLanguage as keyof typeof codeExamples].webhooks, 'webhooks')}
-                  className="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
-                >
-                  {copiedCode === 'webhooks' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Response Format */}
-        <div className="bg-white rounded-lg shadow-sm border mb-12">
-          <div className="p-6 border-b">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Response Format</h2>
-            <p className="text-gray-600">Standard API response structure</p>
-          </div>
-          
-          <div className="p-6">
-            <div className="relative">
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                <code>{`{
-  "success": true,
-  "text": "Extracted document text in Malaysian languages",
-  "confidence": 94.2,
-  "language_detected": "ms",
-  "processing_time": 1.35,
-  "bounding_boxes": [
-    {
-      "text": "Invoice Number: INV-2025-001",
-      "bbox": [100, 200, 400, 220],
-      "confidence": 96.5
-    }
-  ],
-  "metadata": {
-    "file_size": 2048576,
-    "file_type": "application/pdf",
-    "processing_engine": "mataocr-v2.1",
-    "document_type": "invoice",
-    "language_requested": "ms",
-    "confidence_threshold": 0.85,
-    "meta_learning_version": "1.2.0"
-  },
-  "meta_learning_applied": true
-}`}</code>
-              </pre>
-              <button
-                onClick={() => copyToClipboard('response example', 'response')}
-                className="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
-              >
-                {copiedCode === 'response' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Rate Limits & Pricing */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-12">
-          <div className="bg-white rounded-lg shadow-sm border">
-            <div className="p-6 border-b">
-              <h3 className="text-xl font-semibold text-gray-900">Rate Limits</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Starter Plan</span>
-                <span className="font-medium">100 requests/hour</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Professional Plan</span>
-                <span className="font-medium">1,000 requests/hour</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Enterprise Plan</span>
-                <span className="font-medium">Unlimited</span>
+            {/* Quick Stats */}
+            <div className="mt-8 bg-white rounded-lg p-4 border">
+              <h3 className="font-semibold text-gray-900 mb-3">API Status</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Status</span>
+                  <span className="text-green-600 flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                    Operational
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Uptime</span>
+                  <span className="text-gray-900">99.9%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Avg Response</span>
+                  <span className="text-gray-900">1.3s</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Version</span>
+                  <span className="text-gray-900">v2.0.0</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border">
-            <div className="p-6 border-b">
-              <h3 className="text-xl font-semibold text-gray-900">Supported Formats</h3>
-            </div>
-            <div className="p-6 space-y-2">
-              <div className="text-gray-600">Images: JPG, PNG, TIFF, BMP</div>
-              <div className="text-gray-600">Documents: PDF (multi-page)</div>
-              <div className="text-gray-600">Max file size: 50MB</div>
-              <div className="text-gray-600">Max resolution: 4K</div>
-            </div>
-          </div>
-        </div>
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-lg shadow-sm border p-8">
+              
+              {/* Overview Tab */}
+              {activeTab === 'overview' && (
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">MataOCR API</h2>
+                    <p className="text-lg text-gray-600 mb-6">
+                      Powerful OCR API specialized for Malaysian documents and Southeast Asian languages. 
+                      Process images with industry-leading accuracy and speed.
+                    </p>
+                  </div>
 
-        {/* CTA Section */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-8 text-center text-white">
-          <h2 className="text-2xl font-bold mb-4">Ready to Get Started?</h2>
-          <p className="text-blue-100 mb-6">
-            Get your API key and start processing Malaysian documents in minutes.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
-              href="/pricing"
-              className="bg-white hover:bg-gray-100 text-blue-600 px-6 py-3 rounded-lg font-semibold transition-colors"
-            >
-              Get API Key
-            </Link>
-            <a 
-              href="https://docs.mataocr.com"
-              target="_blank"
-              className="border border-white hover:bg-white/10 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2"
-            >
-              <span>View Full Documentation</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
+                  <div className="grid md:grid-cols-3 gap-6">
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <Zap className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                      <h3 className="font-semibold text-gray-900">Lightning Fast</h3>
+                      <p className="text-sm text-gray-600">Average processing time under 2 seconds</p>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 rounded-lg">
+                      <Shield className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                      <h3 className="font-semibold text-gray-900">Secure & Compliant</h3>
+                      <p className="text-sm text-gray-600">PDPA compliant with data sovereignty</p>
+                    </div>
+                    <div className="text-center p-4 bg-purple-50 rounded-lg">
+                      <Globe className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                      <h3 className="font-semibold text-gray-900">Multi-Language</h3>
+                      <p className="text-sm text-gray-600">5 Southeast Asian languages supported</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Supported Languages</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {languages.map((lang) => (
+                        <div key={lang.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                          <span className="text-2xl">{lang.flag}</span>
+                          <div>
+                            <div className="font-medium text-gray-900">{lang.name}</div>
+                            <div className="text-sm text-gray-600">Code: {lang.id}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Base URL</h3>
+                    <div className="bg-gray-900 rounded-lg p-4">
+                      <code className="text-green-400">https://api.mataocr.com</code>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Start Tab */}
+              {activeTab === 'quickstart' && (
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">Quick Start Guide</h2>
+                    <p className="text-lg text-gray-600">
+                      Get started with MataOCR API in minutes
+                    </p>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-3">1. Make Your First Request</h3>
+                      <div className="bg-gray-900 rounded-lg p-4 relative">
+                        <button
+                          onClick={() => copyToClipboard(codeExamples.curl, 'curl-quick')}
+                          className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white"
+                        >
+                          {copiedCode === 'curl-quick' ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                        <pre className="text-green-400 text-sm overflow-x-auto">
+                          <code>{codeExamples.curl}</code>
+                        </pre>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-3">2. Expected Response</h3>
+                      <div className="bg-gray-900 rounded-lg p-4 relative">
+                        <button
+                          onClick={() => copyToClipboard(responseExample, 'response-quick')}
+                          className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white"
+                        >
+                          {copiedCode === 'response-quick' ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                        <pre className="text-blue-400 text-sm overflow-x-auto max-h-64 overflow-y-auto">
+                          <code>{responseExample}</code>
+                        </pre>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-blue-900 mb-2">💡 Pro Tips</h4>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                        <li>• Use language parameter for better accuracy</li>
+                        <li>• Adjust confidence_threshold based on your needs</li>
+                        <li>• MyKad and passport images work best in landscape orientation</li>
+                        <li>• Ensure good lighting and minimal glare for optimal results</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* API Reference Tab */}
+              {activeTab === 'endpoints' && (
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">API Reference</h2>
+                    <p className="text-lg text-gray-600">
+                      Complete reference for all available endpoints
+                    </p>
+                  </div>
+
+                  <div className="space-y-8">
+                    {endpoints.map((endpoint, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-6">
+                        <div className="flex items-center space-x-3 mb-4">
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                            endpoint.method === 'POST' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {endpoint.method}
+                          </span>
+                          <code className="text-lg font-mono text-gray-900">{endpoint.path}</code>
+                        </div>
+                        <p className="text-gray-600 mb-4">{endpoint.description}</p>
+                        
+                        {endpoint.parameters.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold text-gray-900 mb-3">Parameters</h4>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="border-b">
+                                    <th className="text-left py-2">Name</th>
+                                    <th className="text-left py-2">Type</th>
+                                    <th className="text-left py-2">Required</th>
+                                    <th className="text-left py-2">Description</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {endpoint.parameters.map((param, paramIndex) => (
+                                    <tr key={paramIndex} className="border-b">
+                                      <td className="py-2 font-mono text-blue-600">{param.name}</td>
+                                      <td className="py-2 text-gray-600">{param.type}</td>
+                                      <td className="py-2">
+                                        <span className={`px-2 py-1 rounded text-xs ${
+                                          param.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'
+                                        }`}>
+                                          {param.required ? 'Required' : 'Optional'}
+                                        </span>
+                                      </td>
+                                      <td className="py-2 text-gray-600">{param.description}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Examples Tab */}
+              {activeTab === 'examples' && (
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">Code Examples</h2>
+                    <p className="text-lg text-gray-600">
+                      Ready-to-use code examples in popular programming languages
+                    </p>
+                  </div>
+
+                  <div className="space-y-8">
+                    {Object.entries(codeExamples).map(([lang, code]) => (
+                      <div key={lang}>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-3 capitalize">{lang}</h3>
+                        <div className="bg-gray-900 rounded-lg p-4 relative">
+                          <button
+                            onClick={() => copyToClipboard(code, `${lang}-example`)}
+                            className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white"
+                          >
+                            {copiedCode === `${lang}-example` ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                          <pre className="text-green-400 text-sm overflow-x-auto">
+                            <code>{code}</code>
+                          </pre>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* SDKs Tab */}
+              {activeTab === 'sdks' && (
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">SDKs & Libraries</h2>
+                    <p className="text-lg text-gray-600">
+                      Official and community SDKs for easy integration
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="border border-gray-200 rounded-lg p-6">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
+                          <span className="text-white font-bold text-sm">JS</span>
+                        </div>
+                        <h3 className="text-lg font-semibold">JavaScript SDK</h3>
+                      </div>
+                      <p className="text-gray-600 mb-4">Official JavaScript/TypeScript SDK for web and Node.js</p>
+                      <div className="bg-gray-100 rounded p-2 mb-4">
+                        <code className="text-sm">npm install mataocr-js</code>
+                      </div>
+                      <button className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
+                        Coming Soon
+                      </button>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-lg p-6">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                          <span className="text-white font-bold text-sm">PY</span>
+                        </div>
+                        <h3 className="text-lg font-semibold">Python SDK</h3>
+                      </div>
+                      <p className="text-gray-600 mb-4">Official Python SDK with async support</p>
+                      <div className="bg-gray-100 rounded p-2 mb-4">
+                        <code className="text-sm">pip install mataocr-python</code>
+                      </div>
+                      <button className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
+                        Coming Soon
+                      </button>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-lg p-6">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                          <span className="text-white font-bold text-sm">PHP</span>
+                        </div>
+                        <h3 className="text-lg font-semibold">PHP SDK</h3>
+                      </div>
+                      <p className="text-gray-600 mb-4">Official PHP SDK with Laravel support</p>
+                      <div className="bg-gray-100 rounded p-2 mb-4">
+                        <code className="text-sm">composer require mataocr/php-sdk</code>
+                      </div>
+                      <button className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
+                        Coming Soon
+                      </button>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-lg p-6">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                          <span className="text-white font-bold text-sm">GO</span>
+                        </div>
+                        <h3 className="text-lg font-semibold">Go SDK</h3>
+                      </div>
+                      <p className="text-gray-600 mb-4">Official Go SDK for high-performance applications</p>
+                      <div className="bg-gray-100 rounded p-2 mb-4">
+                        <code className="text-sm">go get github.com/mataocr/go-sdk</code>
+                      </div>
+                      <button className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
+                        Coming Soon
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <h3 className="font-semibold text-blue-900 mb-2">Need an SDK for your language?</h3>
+                    <p className="text-blue-800 mb-4">
+                      We're actively developing SDKs for popular programming languages. 
+                      Let us know what you need!
+                    </p>
+                    <Link 
+                      href="/contact"
+                      className="inline-flex items-center text-blue-600 hover:text-blue-700 font-semibold"
+                    >
+                      Request SDK
+                      <ArrowLeft className="w-4 h-4 ml-1 rotate-180" />
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
