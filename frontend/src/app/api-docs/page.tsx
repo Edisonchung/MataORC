@@ -1,4 +1,4 @@
-// src/app/api-docs/page.tsx - API Documentation and Integration Examples
+// src/app/api-docs/page.tsx - Fixed version
 'use client';
 
 import React, { useState } from 'react';
@@ -38,6 +38,56 @@ import { MataOCR } from '@mataocr/sdk';
 const client = new MataOCR({
   apiKey: 'your-api-key-here',
   baseURL: 'https://api.mataocr.com/v1'
+});`,
+      
+      basicOCR: `// Basic OCR processing
+const processDocument = async (file) => {
+  try {
+    const result = await client.process({
+      file: file,
+      language: 'ms', // Bahasa Malaysia
+      confidence_threshold: 0.85
+    });
+    
+    console.log('Extracted text:', result.text);
+    console.log('Accuracy:', result.confidence);
+    console.log('Processing time:', result.processing_time);
+    
+    return result;
+  } catch (error) {
+    console.error('OCR failed:', error.message);
+  }
+};`,
+      
+      batchProcessing: `// Batch processing multiple documents
+const processBatch = async (files) => {
+  const results = await Promise.all(
+    files.map(file => client.process({
+      file: file,
+      language: 'auto', // Auto-detect language
+      project_id: 'invoice-processing'
+    }))
+  );
+  
+  return results.filter(result => result.success);
+};`,
+      
+      webhooks: `// Webhook integration for async processing
+const express = require('express');
+const app = express();
+
+app.post('/webhook/mataocr', (req, res) => {
+  const { document_id, status, result } = req.body;
+  
+  if (status === 'completed') {
+    console.log('Document processed:', document_id);
+    console.log('Extracted text:', result.text);
+    
+    // Process the result in your application
+    saveToDatabase(document_id, result);
+  }
+  
+  res.status(200).send('OK');
 });`
     },
     
@@ -350,7 +400,7 @@ curl -X POST "https://api.mataocr.com/v1/webhooks" \\
 }`}</code>
               </pre>
               <button
-                onClick={() => copyToClipboard(`{...}`, 'response')}
+                onClick={() => copyToClipboard('response example', 'response')}
                 className="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
               >
                 {copiedCode === 'response' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -420,54 +470,4 @@ curl -X POST "https://api.mataocr.com/v1/webhooks" \\
       </div>
     </div>
   );
-},
-      
-      basicOCR: `// Basic OCR processing
-const processDocument = async (file) => {
-  try {
-    const result = await client.process({
-      file: file,
-      language: 'ms', // Bahasa Malaysia
-      confidence_threshold: 0.85
-    });
-    
-    console.log('Extracted text:', result.text);
-    console.log('Accuracy:', result.confidence);
-    console.log('Processing time:', result.processing_time);
-    
-    return result;
-  } catch (error) {
-    console.error('OCR failed:', error.message);
-  }
-};`,
-      
-      batchProcessing: `// Batch processing multiple documents
-const processBatch = async (files) => {
-  const results = await Promise.all(
-    files.map(file => client.process({
-      file: file,
-      language: 'auto', // Auto-detect language
-      project_id: 'invoice-processing'
-    }))
-  );
-  
-  return results.filter(result => result.success);
-};`,
-      
-      webhooks: `// Webhook integration for async processing
-const express = require('express');
-const app = express();
-
-app.post('/webhook/mataocr', (req, res) => {
-  const { document_id, status, result } = req.body;
-  
-  if (status === 'completed') {
-    console.log('Document processed:', document_id);
-    console.log('Extracted text:', result.text);
-    
-    // Process the result in your application
-    saveToDatabase(document_id, result);
-  }
-  
-  res.status(200).send('OK');
-});`
+}
