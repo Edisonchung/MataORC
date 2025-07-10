@@ -3,8 +3,23 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, Download, Eye, Clock, Zap } from 'lucide-react';
 
-// For now, we'll use a simplified API client until the lib is available
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// API Base URL - handle both local and deployed environments
+const getApiBaseUrl = () => {
+  // If we're in browser and on Vercel (or any https site), use a deployed backend
+  if (typeof window !== 'undefined') {
+    const currentHost = window.location.hostname;
+    if (currentHost.includes('vercel.app') || currentHost.includes('mataocr.com')) {
+      // For now, we'll use a placeholder - you'll need to deploy your backend
+      return 'https://your-backend-url.com'; // Update this when you deploy backend
+    }
+  }
+  
+  // Default to localhost for local development
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+console.log('API_BASE_URL:', API_BASE_URL); // Debug log
 
 // Types (simplified versions)
 interface OCRResult {
@@ -139,6 +154,18 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
     setResult(null);
 
     try {
+      console.log('Processing OCR with API:', API_BASE_URL); // Debug log
+      
+      // Check if we can reach the backend
+      const isBackendAvailable = await checkBackendAvailability();
+      
+      if (!isBackendAvailable) {
+        // Fallback to mock data for Vercel demo
+        console.log('Backend not available, using mock data');
+        await simulateMockOCR();
+        return;
+      }
+      
       const formData = new FormData();
       formData.append('file', selectedFile);
       
@@ -146,13 +173,15 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
       params.append('language', selectedLanguage);
       params.append('confidence_threshold', '0.8');
 
-      const response = await fetch(
-        `${API_BASE_URL}/ocr/process?${params.toString()}`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
+      const apiUrl = `${API_BASE_URL}/ocr/process?${params.toString()}`;
+      console.log('Making request to:', apiUrl); // Debug log
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      console.log('Response status:', response.status); // Debug log
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -163,12 +192,87 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
       setResult(ocrResult);
       console.log('OCR Result:', ocrResult); // For debugging
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'OCR processing failed';
-      setError(errorMessage);
-      console.error('OCR Error:', err);
+      console.error('Detailed OCR Error:', err); // More detailed error logging
+      
+      // Fallback to mock for demo purposes
+      console.log('API failed, using mock data for demo');
+      await simulateMockOCR();
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Helper function to check if backend is available
+  const checkBackendAvailability = async (): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(3000) // 3 second timeout
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  // Mock OCR for demo when backend isn't available
+  const simulateMockOCR = async () => {
+    // Simulate processing time
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Mock Malaysian document result based on selected language
+    let mockText = '';
+    if (selectedLanguage === 'ms') {
+      mockText = `KERAJAAN MALAYSIA
+MyKad No: 123456-78-9012
+Nama: Ahmad bin Abdullah
+Alamat: No. 123, Jalan Bunga Raya
+        Taman Sri Malaysia
+        50000 Kuala Lumpur
+Tarikh Lahir: 15 Ogos 1985`;
+    } else if (selectedLanguage === 'zh') {
+      mockText = `马来西亚政府
+身份证号码: 123456-78-9012
+姓名: 陈小明
+地址: 马来西亚吉隆坡
+     斯里马来西亚花园
+     布嘉拉雅路123号`;
+    } else {
+      mockText = `GOVERNMENT OF MALAYSIA
+ID Card No: 123456-78-9012
+Name: Ahmad bin Abdullah
+Address: No. 123, Jalan Bunga Raya
+         Taman Sri Malaysia
+         50000 Kuala Lumpur`;
+    }
+
+    const mockResult: OCRResult = {
+      success: true,
+      text: mockText,
+      confidence: 0.94,
+      language_detected: selectedLanguage,
+      processing_time: 2.1,
+      bounding_boxes: [
+        { text: "KERAJAAN MALAYSIA", bbox: [10, 10, 200, 30], confidence: 0.96 },
+        { text: `MyKad No: 123456-78-9012`, bbox: [10, 40, 250, 60], confidence: 0.93 },
+        { text: "Nama: Ahmad bin Abdullah", bbox: [10, 70, 300, 90], confidence: 0.91 }
+      ],
+      metadata: {
+        file_size: selectedFile?.size || 0,
+        file_type: selectedFile?.type || 'image/jpeg',
+        processing_engine: 'demo_mode_paddleocr',
+        document_type: 'malaysian_id',
+        language_requested: selectedLanguage,
+        confidence_threshold: 0.8,
+        meta_learning_version: '1.0_demo'
+      },
+      meta_learning_applied: true
+    };
+
+    setResult(mockResult);
+    
+    // Show demo notice
+    setError('Demo Mode: Backend not available. Showing sample Malaysian OCR results.');
   };
 
   const resetDemo = () => {
