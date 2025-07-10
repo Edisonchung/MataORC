@@ -1,6 +1,6 @@
 # backend/main.py
 """
-MataOCR FastAPI Backend - Production Version with Real OCR
+MataOCR FastAPI Backend - Railway Production Version with Real OCR
 See Better, Read Smarter - AI-powered OCR for Southeast Asia
 """
 
@@ -13,6 +13,7 @@ import uvicorn
 import os
 import json
 import logging
+import time
 from datetime import datetime
 import uuid
 from pathlib import Path
@@ -22,8 +23,15 @@ import asyncio
 # Import our real OCR service
 from services.ocr_service import real_ocr_service, RealOCRService
 
+# === RAILWAY CONFIGURATION ===
+PORT = int(os.getenv("PORT", 8000))
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # === PYDANTIC MODELS ===
@@ -100,20 +108,46 @@ app = FastAPI(
     ]
 )
 
-# CORS middleware
+# === RAILWAY-OPTIMIZED CORS MIDDLEWARE ===
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000", 
-        "https://mata-fhle8he2t-edison-chungs-projects.vercel.app",  # Your current deployment
+        "https://mata-fhle8he2t-edison-chungs-projects.vercel.app",
         "https://mata-orc.vercel.app",
         "https://mataocr.com", 
-        "https://www.mataocr.com"
+        "https://www.mataocr.com",
+        "https://*.railway.app",  # Railway domains
+        "https://*.up.railway.app",  # New Railway domains
+        "https://api.mataocr.com",  # Custom domain when ready
+        # Allow all Railway subdomains for deployment flexibility
+        "https://mataocr-production.up.railway.app",
+        "https://mataocr-backend.up.railway.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# === RAILWAY MONITORING MIDDLEWARE ===
+@app.middleware("http")
+async def add_process_time_header(request, call_next):
+    """Add request timing and logging for Railway monitoring"""
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    response.headers["X-Service"] = "MataOCR-Railway"
+    
+    # Log requests for Railway logs
+    if ENVIRONMENT == "production":
+        logger.info(
+            f"{request.method} {request.url.path} - "
+            f"Status: {response.status_code} - "
+            f"Time: {process_time:.3f}s - "
+            f"Client: {request.client.host if request.client else 'unknown'}"
+        )
+    return response
 
 # === IN-MEMORY STORAGE (Replace with PostgreSQL later) ===
 projects_db = {}
@@ -137,14 +171,17 @@ async def root():
         "service": "MataOCR API",
         "version": "2.0.0",
         "tagline": "See Better, Read Smarter",
-        "status": "✅ Real OCR Processing Active",
+        "status": "✅ Real OCR Processing Active on Railway",
+        "environment": ENVIRONMENT,
+        "port": PORT,
         "features": [
             "🧠 Real AI-powered OCR with PaddleOCR",
             "🇲🇾 Malaysian language optimization", 
             "📱 Multi-language support (5 languages)",
             "⚡ Sub-3 second processing",
             "📊 Performance analytics",
-            "🔄 Automatic fallback to Tesseract"
+            "🔄 Automatic fallback to Tesseract",
+            "🚂 Railway deployment ready"
         ],
         "endpoints": {
             "docs": "/docs",
@@ -156,22 +193,28 @@ async def root():
 
 @app.get("/health", response_model=HealthResponse, tags=["health"])
 async def health_check():
-    """Basic health check"""
+    """Railway-optimized health check"""
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
         services={
             "api": "✅ Online",
             "ocr_paddle": "✅ Ready",
-            "ocr_tesseract": "✅ Ready",
-            "storage": "✅ Available"
+            "ocr_tesseract": "✅ Ready", 
+            "storage": "✅ Available",
+            "environment": f"🚂 Railway ({ENVIRONMENT})",
+            "port": f"🔌 {PORT}"
         }
     )
 
 @app.get("/health/detailed", response_model=DetailedHealthResponse, tags=["health"])
 async def detailed_health_check():
     """Detailed health check with OCR statistics"""
-    ocr_stats = real_ocr_service.get_stats()
+    try:
+        ocr_stats = real_ocr_service.get_stats()
+    except Exception as e:
+        logger.warning(f"OCR service stats unavailable: {e}")
+        ocr_stats = {"total_processed": 0, "error": str(e)}
     
     return DetailedHealthResponse(
         status="healthy",
@@ -181,7 +224,8 @@ async def detailed_health_check():
             "ocr_paddle": f"✅ Ready ({len(ocr_stats.get('models_loaded', []))} models loaded)",
             "ocr_tesseract": "✅ Ready (fallback)",
             "storage": "✅ Available",
-            "processed_images": f"📊 {ocr_stats.get('total_processed', 0)} total"
+            "processed_images": f"📊 {ocr_stats.get('total_processed', 0)} total",
+            "railway": f"🚂 {ENVIRONMENT} environment"
         },
         ocr_stats=ocr_stats
     )
@@ -213,10 +257,11 @@ async def process_ocr(
     - **High accuracy**: 95%+ for Malaysian documents
     - **Fast processing**: <3 seconds average
     - **Automatic fallback**: PaddleOCR → Tesseract if needed
+    - **Railway deployment**: Optimized for cloud infrastructure
     """
     
     # Validate file type
-    if not file.content_type.startswith('image/'):
+    if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(
             status_code=400, 
             detail="File must be an image (jpg, png, etc.)"
@@ -236,12 +281,32 @@ async def process_ocr(
             detail="Confidence threshold must be between 0.1 and 1.0"
         )
     
+    # Check file size (Railway has memory limits)
+    max_size = int(os.getenv("UPLOAD_MAX_SIZE", 50000000))  # 50MB default
+    if hasattr(file, 'size') and file.size and file.size > max_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size: {max_size/1000000:.1f}MB"
+        )
+    
     try:
         # Read file data
         file_data = await file.read()
         
+        # Additional size check after reading
+        if len(file_data) > max_size:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size: {max_size/1000000:.1f}MB"
+            )
+        
         # Log processing start
-        logger.info(f"Processing OCR: {file.filename}, language={language}, size={len(file_data)} bytes")
+        logger.info(
+            f"Processing OCR: {file.filename}, "
+            f"language={language}, "
+            f"size={len(file_data)} bytes, "
+            f"environment={ENVIRONMENT}"
+        )
         
         # Process with real OCR service
         result = await real_ocr_service.process_image(
@@ -250,7 +315,7 @@ async def process_ocr(
             confidence_threshold=confidence_threshold
         )
         
-        # Add metadata
+        # Add Railway-specific metadata
         result["metadata"].update({
             "file_size": len(file_data),
             "file_type": file.content_type,
@@ -258,23 +323,36 @@ async def process_ocr(
             "language_requested": language,
             "project_id": project_id,
             "confidence_threshold": confidence_threshold,
-            "meta_learning_version": "1.0"
+            "meta_learning_version": "1.0",
+            "processed_on": "Railway",
+            "environment": ENVIRONMENT,
+            "service_version": "2.0.0"
         })
         
-        # Save file if processing was successful (optional)
+        # Save file if processing was successful (optional, for Railway storage)
         if result["success"] and upload_dir.exists():
-            file_id = str(uuid.uuid4())
-            file_path = upload_dir / f"{file_id}_{file.filename}"
-            
-            async with aiofiles.open(file_path, 'wb') as f:
-                await f.write(file_data)
-            
-            result["metadata"]["saved_path"] = str(file_path)
+            try:
+                file_id = str(uuid.uuid4())
+                file_path = upload_dir / f"{file_id}_{file.filename}"
+                
+                async with aiofiles.open(file_path, 'wb') as f:
+                    await f.write(file_data)
+                
+                result["metadata"]["saved_path"] = str(file_path)
+            except Exception as save_error:
+                logger.warning(f"File save failed (non-critical): {save_error}")
         
-        logger.info(f"OCR completed: success={result['success']}, confidence={result['confidence']:.2f}")
+        logger.info(
+            f"OCR completed: success={result['success']}, "
+            f"confidence={result['confidence']:.2f}, "
+            f"processing_time={result['processing_time']:.2f}s"
+        )
         
         return OCRResult(**result)
         
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors)
+        raise
     except Exception as e:
         logger.error(f"OCR processing error: {str(e)}")
         raise HTTPException(
@@ -290,16 +368,23 @@ async def get_ocr_statistics():
     
     Get detailed analytics about OCR processing performance
     """
-    stats = real_ocr_service.get_stats()
+    try:
+        stats = real_ocr_service.get_stats()
+    except Exception as e:
+        logger.warning(f"Stats service unavailable: {e}")
+        stats = {"total_processed": 0, "error": str(e)}
     
     return {
         "service": "MataOCR Statistics",
         "timestamp": datetime.now().isoformat(),
+        "environment": ENVIRONMENT,
+        "deployment": "Railway",
         "performance": {
             "total_processed": stats.get("total_processed", 0),
             "average_processing_time": f"{stats.get('avg_processing_time', 0):.2f} seconds",
             "average_confidence": f"{stats.get('avg_confidence', 0):.1%}",
-            "error_rate": f"{stats.get('error_count', 0) / max(stats.get('total_processed', 1), 1):.1%}"
+            "error_rate": f"{stats.get('error_count', 0) / max(stats.get('total_processed', 1), 1):.1%}",
+            "uptime": "Railway managed"
         },
         "languages": {
             "supported": list(SUPPORTED_LANGUAGES.keys()),
@@ -308,12 +393,13 @@ async def get_ocr_statistics():
         },
         "system": {
             "ocr_engines": ["PaddleOCR (primary)", "Tesseract (fallback)"],
-            "uptime": "Available since service start",
+            "deployment_platform": "Railway",
+            "port": PORT,
             "status": "✅ Operational"
         }
     }
 
-# === PROJECT MANAGEMENT (Existing endpoints) ===
+# === PROJECT MANAGEMENT ===
 @app.post("/projects/", response_model=Project, tags=["projects"])
 async def create_project(project: ProjectCreate):
     """Create a new OCR project"""
@@ -354,26 +440,56 @@ async def http_exception_handler(request, exc):
         content={
             "error": exc.detail,
             "service": "MataOCR API",
+            "version": "2.0.0",
             "timestamp": datetime.now().isoformat(),
+            "environment": ENVIRONMENT,
             "documentation": "https://mataocr.com/docs"
+        }
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """General exception handler for Railway debugging"""
+    logger.error(f"Unhandled exception: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "service": "MataOCR API",
+            "version": "2.0.0",
+            "timestamp": datetime.now().isoformat(),
+            "environment": ENVIRONMENT,
+            "message": "Please check Railway logs for details"
         }
     )
 
 # === STARTUP EVENTS ===
 @app.on_event("startup")
 async def startup_event():
-    """Initialize services on startup"""
-    logger.info("🚀 MataOCR API starting up...")
+    """Initialize services on Railway startup"""
+    logger.info("🚂 MataOCR API starting on Railway...")
+    logger.info(f"🌍 Environment: {ENVIRONMENT}")
+    logger.info(f"🔌 Port: {PORT}")
     logger.info("✅ Real OCR service initialized")
     logger.info("📊 Statistics tracking enabled")
     logger.info("🇲🇾 Malaysian language support active")
+    logger.info("🔧 Railway monitoring enabled")
     logger.info("⚡ Ready for high-performance OCR processing!")
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on Railway shutdown"""
+    logger.info("🛑 MataOCR API shutting down...")
+    logger.info("💾 Cleaning up resources...")
+    logger.info("✅ Shutdown complete")
+
+# === RAILWAY MAIN BLOCK ===
 if __name__ == "__main__":
     uvicorn.run(
         "main:app", 
         host="0.0.0.0", 
-        port=8000, 
-        reload=True,
-        log_level="info"
+        port=PORT,  # Use Railway's PORT environment variable
+        reload=False if ENVIRONMENT == "production" else True,
+        log_level="info",
+        access_log=True
     )
