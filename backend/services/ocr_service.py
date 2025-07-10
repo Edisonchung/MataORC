@@ -1,379 +1,369 @@
+# backend/services/ocr_service.py
 """
-MataOCR Real OCR Service Implementation
-Advanced OCR processing with PaddleOCR for Malaysian documents
+MataOCR Real OCR Service
+Advanced OCR processing with Malaysian optimization
+See Better, Read Smarter - AI-powered OCR for Southeast Asia
 """
 
-import os
 import cv2
 import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
-import logging
-from pathlib import Path
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-import time
-from PIL import Image, ImageEnhance, ImageFilter
-
-# OCR engines
 from paddleocr import PaddleOCR
 import pytesseract
+from PIL import Image
+import asyncio
+import logging
+import time
+from typing import List, Dict, Any, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+import re
+from pathlib import Path
 
-# Image processing
-from albumentations import Compose, RandomBrightnessContrast, RandomGamma, Normalize
-from albumentations.pytorch import ToTensorV2
-
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class MalaysianDocumentProcessor:
-    """Specialized processing for Malaysian document types"""
+class RealOCRService:
+    """
+    Advanced OCR service with Malaysian optimization
+    Primary: PaddleOCR (excellent for Asian languages)
+    Fallback: Tesseract
+    """
     
-    DOCUMENT_PATTERNS = {
-        'mykad': {
-            'keywords': ['mykad', 'kad pengenalan', 'malaysia', 'kerajaan malaysia'],
-            'fields': ['nama', 'no. kad pengenalan', 'alamat', 'tarikh lahir'],
-            'language_priority': ['ms', 'en']
-        },
-        'passport': {
-            'keywords': ['passport', 'pasport malaysia', 'malaysia'],
-            'fields': ['nama', 'no. pasport', 'tarikh lahir', 'tempat lahir'],
-            'language_priority': ['en', 'ms']
-        },
-        'driving_license': {
-            'keywords': ['lesen memandu', 'driving licence', 'jpj'],
-            'fields': ['nama', 'no. lesen', 'kelas', 'tarikh tamat'],
-            'language_priority': ['ms', 'en']
-        },
-        'business_registration': {
-            'keywords': ['sijil pendaftaran', 'registration certificate', 'ssm'],
-            'fields': ['nama syarikat', 'no. pendaftaran', 'tarikh'],
-            'language_priority': ['ms', 'en']
+    def __init__(self):
+        self.executor = ThreadPoolExecutor(max_workers=4)
+        self.paddle_models = {}
+        self.stats = {
+            "total_processed": 0,
+            "avg_processing_time": 0,
+            "avg_confidence": 0,
+            "language_distribution": {},
+            "error_count": 0
         }
-    }
+        
+        # Malaysian language mappings
+        self.language_codes = {
+            'ms': 'en',  # Bahasa Malaysia (use English model with post-processing)
+            'en': 'en',  # English
+            'zh': 'ch',  # Chinese
+            'ta': 'ta',  # Tamil
+            'ar': 'ar'   # Arabic (for Jawi script)
+        }
+        
+        # Malaysian document patterns
+        self.malaysian_patterns = {
+            'mykad': r'\d{6}-\d{2}-\d{4}',  # MyKad IC number
+            'passport': r'[A-Z]\d{8}',       # Malaysian passport
+            'phone': r'0\d{1,2}-\d{7,8}',   # Malaysian phone
+            'postcode': r'\d{5}',           # Malaysian postcode
+        }
+        
+        # Common Malaysian text corrections
+        self.malaysian_corrections = {
+            'Identiti': 'Identiti',
+            'Warganegara': 'Warganegara',
+            'Lelaki': 'Lelaki',
+            'Perempuan': 'Perempuan',
+            'Alamat': 'Alamat',
+            'Tarikh': 'Tarikh',
+            'Lahir': 'Lahir'
+        }
 
-    @staticmethod
-    def detect_document_type(text: str) -> str:
+    async def initialize_paddle_model(self, language: str) -> PaddleOCR:
+        """Initialize PaddleOCR model for specific language"""
+        if language not in self.paddle_models:
+            try:
+                paddle_lang = self.language_codes.get(language, 'en')
+                
+                # Run in thread pool to avoid blocking
+                loop = asyncio.get_event_loop()
+                paddle_ocr = await loop.run_in_executor(
+                    self.executor,
+                    lambda: PaddleOCR(
+                        use_angle_cls=True,
+                        lang=paddle_lang,
+                        use_gpu=False,  # Set to True if GPU available
+                        show_log=False
+                    )
+                )
+                
+                self.paddle_models[language] = paddle_ocr
+                logger.info(f"Initialized PaddleOCR for language: {language}")
+                
+            except Exception as e:
+                logger.error(f"Failed to initialize PaddleOCR for {language}: {e}")
+                return None
+                
+        return self.paddle_models.get(language)
+
+    def preprocess_image(self, image: np.ndarray) -> np.ndarray:
+        """Enhanced image preprocessing for Malaysian documents"""
+        try:
+            # Convert to grayscale if needed
+            if len(image.shape) == 3:
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = image.copy()
+            
+            # Noise reduction
+            denoised = cv2.medianBlur(gray, 3)
+            
+            # Contrast enhancement using CLAHE
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+            enhanced = clahe.apply(denoised)
+            
+            # Adaptive thresholding for better text extraction
+            binary = cv2.adaptiveThreshold(
+                enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                cv2.THRESH_BINARY, 11, 2
+            )
+            
+            return binary
+            
+        except Exception as e:
+            logger.error(f"Image preprocessing failed: {e}")
+            return image
+
+    def detect_document_type(self, text: str) -> str:
         """Detect Malaysian document type from extracted text"""
         text_lower = text.lower()
         
-        for doc_type, config in MalaysianDocumentProcessor.DOCUMENT_PATTERNS.items():
-            keyword_matches = sum(1 for keyword in config['keywords'] if keyword in text_lower)
-            if keyword_matches >= 1:
-                return doc_type
-        
-        return 'general'
+        if any(keyword in text_lower for keyword in ['mykad', 'kad pengenalan', 'identity']):
+            return 'mykad'
+        elif any(keyword in text_lower for keyword in ['passport', 'pasport']):
+            return 'passport'
+        elif any(keyword in text_lower for keyword in ['license', 'lesen']):
+            return 'license'
+        elif any(keyword in text_lower for keyword in ['surat', 'letter', 'memorandum']):
+            return 'official_document'
+        else:
+            return 'general'
 
-    @staticmethod
-    def enhance_malaysian_text(text: str, doc_type: str) -> str:
+    def apply_malaysian_corrections(self, text: str, document_type: str) -> str:
         """Apply Malaysian-specific text corrections"""
-        # Common OCR errors in Malaysian documents
-        corrections = {
-            'KERAJAAH': 'KERAJAAN',
-            'MALAYSLA': 'MALAYSIA',
-            'MYKAO': 'MYKAD',
-            'ALAMAI': 'ALAMAT',
-            'IARIEH': 'TARIKH',
-            'PENGENALAN': 'PENGENALAN',
-            '8ALAMAT': 'ALAMAT',
-            'NANA': 'NAMA',
-            'L4HIR': 'LAHIR',
-        }
+        corrected_text = text
         
-        enhanced_text = text
-        for error, correction in corrections.items():
-            enhanced_text = enhanced_text.replace(error, correction)
+        # Apply general corrections
+        for wrong, correct in self.malaysian_corrections.items():
+            corrected_text = re.sub(wrong, correct, corrected_text, flags=re.IGNORECASE)
         
-        return enhanced_text
+        # Format Malaysian IC numbers
+        ic_pattern = r'(\d{6})\s*-?\s*(\d{2})\s*-?\s*(\d{4})'
+        corrected_text = re.sub(ic_pattern, r'\1-\2-\3', corrected_text)
+        
+        # Format Malaysian phone numbers
+        phone_pattern = r'0(\d{1,2})\s*-?\s*(\d{7,8})'
+        corrected_text = re.sub(phone_pattern, r'0\1-\2', corrected_text)
+        
+        return corrected_text
 
-class RealOCRService:
-    """Production OCR service with PaddleOCR and Malaysian optimization"""
-    
-    def __init__(self):
-        self.is_initialized = False
-        self.paddle_ocr_engines = {}
-        self.tesseract_config = '--oem 3 --psm 6'
-        self.executor = ThreadPoolExecutor(max_workers=2)
-        self.malaysian_processor = MalaysianDocumentProcessor()
-        
-        # Performance tracking
-        self.processing_stats = {
-            'total_processed': 0,
-            'avg_processing_time': 0.0,
-            'accuracy_scores': []
-        }
-
-    async def initialize(self):
-        """Initialize OCR engines asynchronously"""
-        if self.is_initialized:
-            return
-            
+    async def process_with_paddle(self, image: np.ndarray, language: str) -> Optional[List]:
+        """Process image with PaddleOCR"""
         try:
-            logger.info("Initializing PaddleOCR engines...")
-            
-            # Initialize PaddleOCR for different languages
-            # Run in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
-            
-            # Malaysian languages
-            engines_to_init = {
-                'ms': {'lang': 'en', 'use_angle_cls': True, 'use_gpu': False},  # English model works for Malay
-                'en': {'lang': 'en', 'use_angle_cls': True, 'use_gpu': False},
-                'zh': {'lang': 'ch', 'use_angle_cls': True, 'use_gpu': False},
-                'ta': {'lang': 'ta', 'use_angle_cls': True, 'use_gpu': False},
-                'ar': {'lang': 'ar', 'use_angle_cls': True, 'use_gpu': False},
-            }
-            
-            for lang_code, config in engines_to_init.items():
-                try:
-                    self.paddle_ocr_engines[lang_code] = await loop.run_in_executor(
-                        self.executor, 
-                        lambda cfg=config: PaddleOCR(**cfg)
-                    )
-                    logger.info(f"Initialized PaddleOCR for {lang_code}")
-                except Exception as e:
-                    logger.warning(f"Failed to initialize PaddleOCR for {lang_code}: {e}")
-                    # Fallback to English model
-                    if lang_code != 'en':
-                        self.paddle_ocr_engines[lang_code] = self.paddle_ocr_engines.get('en')
-            
-            self.is_initialized = True
-            logger.info("OCR Service initialization complete")
-            
-        except Exception as e:
-            logger.error(f"OCR Service initialization failed: {e}")
-            raise
-
-    async def health_check(self) -> str:
-        """Health check for OCR service"""
-        if not self.is_initialized:
-            return "initializing"
-        
-        return f"operational - {len(self.paddle_ocr_engines)} engines ready"
-
-    def preprocess_image(self, image_path: Path) -> np.ndarray:
-        """Advanced image preprocessing for better OCR accuracy"""
-        try:
-            # Load image
-            image = cv2.imread(str(image_path))
-            if image is None:
-                # Try with PIL for different formats
-                pil_image = Image.open(image_path)
-                image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-            
-            # Convert to grayscale
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            
-            # Noise reduction
-            denoised = cv2.fastNlMeansDenoising(gray)
-            
-            # Adaptive threshold for better text extraction
-            adaptive_thresh = cv2.adaptiveThreshold(
-                denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-            )
-            
-            # Morphological operations to clean up
-            kernel = np.ones((1, 1), np.uint8)
-            processed = cv2.morphologyEx(adaptive_thresh, cv2.MORPH_CLOSE, kernel)
-            
-            return processed
-            
-        except Exception as e:
-            logger.warning(f"Image preprocessing failed: {e}, using original")
-            # Fallback to original image
-            image = cv2.imread(str(image_path))
-            return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image is not None else None
-
-    async def extract_text_paddleocr(self, image_path: Path, language: str) -> Dict[str, Any]:
-        """Extract text using PaddleOCR"""
-        try:
-            # Get appropriate OCR engine
-            ocr_engine = self.paddle_ocr_engines.get(language, self.paddle_ocr_engines.get('en'))
-            if not ocr_engine:
-                raise Exception(f"OCR engine not available for language: {language}")
-            
-            # Preprocess image
-            processed_image = self.preprocess_image(image_path)
-            if processed_image is None:
-                raise Exception("Failed to load image")
+            paddle_ocr = await self.initialize_paddle_model(language)
+            if not paddle_ocr:
+                return None
             
             # Run OCR in thread pool
             loop = asyncio.get_event_loop()
             results = await loop.run_in_executor(
                 self.executor,
-                lambda: ocr_engine.ocr(processed_image, cls=True)
+                lambda: paddle_ocr.ocr(image, cls=True)
             )
             
-            if not results or not results[0]:
-                return {
-                    'text': '',
-                    'confidence': 0.0,
-                    'bounding_boxes': [],
-                    'word_count': 0
-                }
-            
-            # Process results
-            extracted_text = []
-            bounding_boxes = []
-            confidences = []
-            
-            for line in results[0]:
-                if line:
-                    bbox, (text, confidence) = line
-                    extracted_text.append(text)
-                    bounding_boxes.append({
-                        'text': text,
-                        'bbox': [int(coord) for coord in np.array(bbox).flatten()[:4]],
-                        'confidence': float(confidence)
-                    })
-                    confidences.append(confidence)
-            
-            # Combine text
-            full_text = '\n'.join(extracted_text)
-            avg_confidence = np.mean(confidences) if confidences else 0.0
-            
-            return {
-                'text': full_text,
-                'confidence': float(avg_confidence),
-                'bounding_boxes': bounding_boxes,
-                'word_count': len(extracted_text)
-            }
+            return results[0] if results and results[0] else []
             
         except Exception as e:
-            logger.error(f"PaddleOCR extraction failed: {e}")
-            raise
+            logger.error(f"PaddleOCR processing failed: {e}")
+            return None
 
-    async def extract_text_tesseract(self, image_path: Path, language: str) -> Dict[str, Any]:
-        """Fallback OCR using Tesseract"""
+    def process_with_tesseract(self, image: np.ndarray, language: str) -> List:
+        """Fallback processing with Tesseract"""
         try:
-            # Language mapping for Tesseract
-            tesseract_langs = {
-                'ms': 'msa',  # Malay
-                'en': 'eng',  # English
-                'zh': 'chi_sim',  # Simplified Chinese
-                'ta': 'tam',  # Tamil
-                'ar': 'ara'   # Arabic
-            }
+            # Convert to PIL Image
+            pil_image = Image.fromarray(image)
             
-            tesseract_lang = tesseract_langs.get(language, 'eng')
+            # Tesseract language mapping
+            tesseract_lang = {
+                'ms': 'eng',  # Use English for Bahasa Malaysia
+                'en': 'eng',
+                'zh': 'chi_sim',
+                'ta': 'tam',
+                'ar': 'ara'
+            }.get(language, 'eng')
             
-            # Load and preprocess image
-            processed_image = self.preprocess_image(image_path)
-            
-            # Run Tesseract
-            loop = asyncio.get_event_loop()
-            text = await loop.run_in_executor(
-                self.executor,
-                lambda: pytesseract.image_to_string(
-                    processed_image, 
-                    lang=tesseract_lang, 
-                    config=self.tesseract_config
-                )
+            # Extract text with bounding boxes
+            data = pytesseract.image_to_data(
+                pil_image, 
+                lang=tesseract_lang, 
+                output_type=pytesseract.Output.DICT
             )
             
-            # Get confidence data
-            data = await loop.run_in_executor(
-                self.executor,
-                lambda: pytesseract.image_to_data(
-                    processed_image, 
-                    lang=tesseract_lang, 
-                    output_type=pytesseract.Output.DICT
-                )
-            )
+            results = []
+            for i in range(len(data['text'])):
+                if int(data['conf'][i]) > 30:  # Confidence threshold
+                    x = data['left'][i]
+                    y = data['top'][i]
+                    w = data['width'][i]
+                    h = data['height'][i]
+                    
+                    results.append([
+                        [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+                        (data['text'][i], data['conf'][i] / 100.0)
+                    ])
             
-            # Process confidence scores
-            confidences = [int(conf) for conf in data['conf'] if int(conf) > 0]
-            avg_confidence = np.mean(confidences) / 100.0 if confidences else 0.0
-            
-            return {
-                'text': text.strip(),
-                'confidence': float(avg_confidence),
-                'bounding_boxes': [],  # Tesseract bounding boxes would require more processing
-                'word_count': len(text.split())
-            }
+            return results
             
         except Exception as e:
-            logger.error(f"Tesseract extraction failed: {e}")
-            raise
+            logger.error(f"Tesseract processing failed: {e}")
+            return []
 
-    async def process_image(self, file_path: Path, language: str = "ms") -> Dict[str, Any]:
-        """Main OCR processing method with Malaysian optimization"""
-        if not self.is_initialized:
-            await self.initialize()
-        
+    async def process_image(
+        self, 
+        image_data: bytes, 
+        language: str = 'ms',
+        confidence_threshold: float = 0.7
+    ) -> Dict[str, Any]:
+        """
+        Main OCR processing function
+        """
         start_time = time.time()
         
         try:
-            logger.info(f"Processing image: {file_path} with language: {language}")
+            # Convert bytes to numpy array
+            nparr = np.frombuffer(image_data, np.uint8)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             
-            # Primary OCR with PaddleOCR
-            try:
-                primary_result = await self.extract_text_paddleocr(file_path, language)
-                ocr_engine = "paddleocr"
-            except Exception as e:
-                logger.warning(f"PaddleOCR failed, falling back to Tesseract: {e}")
-                primary_result = await self.extract_text_tesseract(file_path, language)
-                ocr_engine = "tesseract_fallback"
+            if image is None:
+                raise ValueError("Could not decode image")
             
-            # Malaysian document processing
-            raw_text = primary_result['text']
-            document_type = self.malaysian_processor.detect_document_type(raw_text)
-            enhanced_text = self.malaysian_processor.enhance_malaysian_text(raw_text, document_type)
+            # Preprocess image
+            processed_image = self.preprocess_image(image)
             
-            # Calculate processing time
+            # Try PaddleOCR first
+            paddle_results = await self.process_with_paddle(processed_image, language)
+            
+            # Fallback to Tesseract if PaddleOCR fails
+            if not paddle_results:
+                logger.warning("PaddleOCR failed, using Tesseract fallback")
+                tesseract_results = self.process_with_tesseract(processed_image, language)
+                results = tesseract_results
+                processing_engine = "tesseract"
+            else:
+                results = paddle_results
+                processing_engine = "paddleocr"
+            
+            # Extract text and bounding boxes
+            extracted_text = ""
+            bounding_boxes = []
+            total_confidence = 0
+            valid_detections = 0
+            
+            for detection in results:
+                if len(detection) >= 2:
+                    bbox = detection[0]
+                    text_info = detection[1]
+                    
+                    if isinstance(text_info, (list, tuple)) and len(text_info) >= 2:
+                        text = text_info[0]
+                        confidence = float(text_info[1])
+                    else:
+                        text = str(text_info)
+                        confidence = 0.8  # Default confidence
+                    
+                    if confidence >= confidence_threshold and text.strip():
+                        extracted_text += text + " "
+                        bounding_boxes.append({
+                            "text": text,
+                            "bbox": bbox,
+                            "confidence": confidence
+                        })
+                        total_confidence += confidence
+                        valid_detections += 1
+            
+            # Clean up extracted text
+            extracted_text = extracted_text.strip()
+            
+            # Detect document type
+            document_type = self.detect_document_type(extracted_text)
+            
+            # Apply Malaysian corrections
+            corrected_text = self.apply_malaysian_corrections(extracted_text, document_type)
+            
+            # Calculate average confidence
+            avg_confidence = total_confidence / valid_detections if valid_detections > 0 else 0
+            
+            # Processing time
             processing_time = time.time() - start_time
             
             # Update statistics
-            self.processing_stats['total_processed'] += 1
-            self.processing_stats['avg_processing_time'] = (
-                (self.processing_stats['avg_processing_time'] * (self.processing_stats['total_processed'] - 1) + processing_time) 
-                / self.processing_stats['total_processed']
-            )
-            self.processing_stats['accuracy_scores'].append(primary_result['confidence'])
+            self.update_stats(processing_time, avg_confidence, language)
             
-            # Prepare final result
+            # Prepare result
             result = {
-                'text': enhanced_text,
-                'confidence': primary_result['confidence'],
-                'language_detected': language,
-                'bounding_boxes': primary_result['bounding_boxes'],
-                'document_type': document_type,
-                'processing_engine': ocr_engine,
-                'word_count': primary_result['word_count'],
-                'processing_time': processing_time,
-                'malaysian_optimized': True
+                "success": True,
+                "text": corrected_text,
+                "confidence": avg_confidence,
+                "language_detected": language,
+                "processing_time": processing_time,
+                "bounding_boxes": bounding_boxes,
+                "metadata": {
+                    "processing_engine": processing_engine,
+                    "document_type": document_type,
+                    "total_detections": len(results),
+                    "valid_detections": valid_detections,
+                    "confidence_threshold": confidence_threshold,
+                    "image_size": image.shape if image is not None else None
+                },
+                "meta_learning_applied": False  # Future feature
             }
             
-            logger.info(f"OCR completed in {processing_time:.2f}s with {primary_result['confidence']:.2f} confidence")
+            logger.info(f"OCR completed in {processing_time:.2f}s with {avg_confidence:.2f} confidence")
             return result
             
         except Exception as e:
-            logger.error(f"OCR processing failed completely: {e}")
-            # Return error result
+            self.stats["error_count"] += 1
+            logger.error(f"OCR processing failed: {e}")
+            
             return {
-                'text': '',
-                'confidence': 0.0,
-                'language_detected': language,
-                'bounding_boxes': [],
-                'document_type': 'error',
-                'processing_engine': 'failed',
-                'word_count': 0,
-                'processing_time': time.time() - start_time,
-                'malaysian_optimized': False,
-                'error': str(e)
+                "success": False,
+                "text": "",
+                "confidence": 0.0,
+                "language_detected": language,
+                "processing_time": time.time() - start_time,
+                "bounding_boxes": [],
+                "metadata": {
+                    "error": str(e),
+                    "processing_engine": "none",
+                    "document_type": "unknown"
+                },
+                "meta_learning_applied": False
             }
 
-    async def get_processing_stats(self) -> Dict[str, Any]:
-        """Get OCR processing statistics"""
-        avg_accuracy = np.mean(self.processing_stats['accuracy_scores']) if self.processing_stats['accuracy_scores'] else 0.0
+    def update_stats(self, processing_time: float, confidence: float, language: str):
+        """Update processing statistics"""
+        self.stats["total_processed"] += 1
         
+        # Update average processing time
+        total = self.stats["total_processed"]
+        current_avg = self.stats["avg_processing_time"]
+        self.stats["avg_processing_time"] = ((current_avg * (total - 1)) + processing_time) / total
+        
+        # Update average confidence
+        current_confidence_avg = self.stats["avg_confidence"]
+        self.stats["avg_confidence"] = ((current_confidence_avg * (total - 1)) + confidence) / total
+        
+        # Update language distribution
+        if language not in self.stats["language_distribution"]:
+            self.stats["language_distribution"][language] = 0
+        self.stats["language_distribution"][language] += 1
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get processing statistics"""
         return {
-            'total_processed': self.processing_stats['total_processed'],
-            'average_processing_time': round(self.processing_stats['avg_processing_time'], 2),
-            'average_accuracy': round(avg_accuracy, 3),
-            'engines_available': list(self.paddle_ocr_engines.keys()),
-            'service_status': await self.health_check()
+            **self.stats,
+            "models_loaded": list(self.paddle_models.keys()),
+            "supported_languages": list(self.language_codes.keys())
         }
 
-    def __del__(self):
-        """Cleanup resources"""
-        if hasattr(self, 'executor'):
-            self.executor.shutdown(wait=False)
+# Global OCR service instance
+real_ocr_service = RealOCRService()
