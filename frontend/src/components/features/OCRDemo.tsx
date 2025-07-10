@@ -1,4 +1,4 @@
-// src/components/features/OCRDemo.tsx
+// src/components/features/OCRDemo.tsx - Fixed Props Interface
 'use client';
 
 import React, { useState, useRef } from 'react';
@@ -28,16 +28,23 @@ interface OCRResult {
   };
 }
 
+// FIXED: Updated props interface to match usage
 interface OCRDemoProps {
   className?: string;
+  language?: string;  // Added language prop
+  apiEndpoint?: string;  // Added apiEndpoint prop
 }
 
-const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
+const OCRDemo: React.FC<OCRDemoProps> = ({ 
+  className = '', 
+  language: initialLanguage = 'ms',
+  apiEndpoint = API_BASE_URL 
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState('ms');
+  const [selectedLanguage, setSelectedLanguage] = useState(initialLanguage);
   const [result, setResult] = useState<OCRResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showBoundingBoxes, setShowBoundingBoxes] = useState(false);
@@ -117,7 +124,7 @@ const OCRDemo: React.FC<OCRDemoProps> = ({ className = '' }) => {
       formData.append('language', selectedLanguage);
       formData.append('confidence_threshold', '0.7');
 
-      const apiUrl = `${API_BASE_URL}/ocr`;
+      const apiUrl = `${apiEndpoint}/ocr`;
       console.log('Making request to:', apiUrl);
 
       const response = await fetch(apiUrl, {
