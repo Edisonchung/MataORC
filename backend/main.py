@@ -1,6 +1,5 @@
 """
 MataOCR FastAPI Backend - Working Version
-Combines your advanced architecture with immediate functionality
 See Better, Read Smarter - AI-powered OCR for Southeast Asia
 """
 
@@ -490,7 +489,7 @@ async def internal_error_handler(request, exc):
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main_working:app",
+        "main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,
